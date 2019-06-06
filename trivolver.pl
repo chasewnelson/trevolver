@@ -28,7 +28,6 @@
 use strict;
 use List::Util qw(max sum);
 use Getopt::Long;
-use Math::TrulyRandom;
 
 STDOUT->autoflush(1);
 
