@@ -2,4 +2,5 @@
 
 **`trivolver`** is a Perl script for simulating non-reversible DNA sequence evolution on a fixed bifurcating tree using trinucleotide context.
 
-Logo image copyright 2019 by Mitch Lin; copyright-free DNA helix obtained from Pixabay.
+## <a name="acknowledgments"></a>Acknowledgments
+**`trivolver`** was written with support from a Gerstner Scholars Fellowship from the Gerstner Family Foundation at the American Museum of Natural History (2016-2019), and is maintained with support from the same. The logo image was designed by Mitch Lin (2019); copyright-free DNA helix obtained from Pixabay.
