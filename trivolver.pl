@@ -44,37 +44,39 @@ my $seed_sequence; # file containing starting (seed) sequence at tree root, to b
 my $rate_matrix; # file containing 64 x 4 tab-delimited rate matrix in alphabetical order. First row values for: AAA>AAA\tAAA>ACA\tAAA>AGA\tAAA>ATA\n
 my $branch_unit; # branch lengths will be multiplied by this value and rounded up to the nearest integer to determine number of generations
 my $random_seed; # integer with which to seed the random number generator
+my $verbose;
 
 # Get user input, if given. If a Boolean argument is passed, its value is 1; else undef
 GetOptions( "tree=s" => \$tree,
 			"seed_sequence=s" => \$seed_sequence,
 			"rate_matrix=s" => \$rate_matrix,
 			"branch_unit=f" => \$branch_unit,
-			"random_seed=i" => \$random_seed)
+			"random_seed=i" => \$random_seed,
+			"verbose" => \$verbose)
 			
-			or die "\nWARNING: Error in command line arguments. Script terminated.\n\n";
+			or die "\n### WARNING: Error in command line arguments. Script terminated.\n\n";
 
 unless(-f "$tree") {
-	die "\nWARNING: A valid --tree option must be provided: file containing bifurcating evolutionary tree with branch lengths. Only first tree used\n".
-		"SNPGenie terminated.\n\n";
+	die "\n### WARNING: A valid --tree option must be provided: file containing bifurcating evolutionary tree with branch lengths. Only first tree used\n".
+		"### trivolver terminated.\n\n";
 }
 
 unless(-f "$seed_sequence") {
-	die "\nWARNING: A valid --seed_sequence option must be provided: file containing starting (seed) sequence at tree root, to be evolved. Only first sequence used\n".
-		"SNPGenie terminated.\n\n";
+	die "\n### WARNING: A valid --seed_sequence option must be provided: file containing starting (seed) sequence at tree root, to be evolved. Only first sequence used\n".
+		"### trivolver terminated.\n\n";
 }
 
 unless(-f "$rate_matrix") {
-	die "\nWARNING: A valid --rate_matrix option must be provided: file containing 64 x 4 tab-delimited rate matrix in alphabetical order. First row values for: AAA>AAA\\tAAA>ACA\\tAAA>AGA\\tAAA>ATA\\n\n".
-		"SNPGenie terminated.\n\n";
+	die "\n### WARNING: A valid --rate_matrix option must be provided: file containing 64 x 4 tab-delimited rate matrix in alphabetical order. First row values for: AAA>AAA\\tAAA>ACA\\tAAA>AGA\\tAAA>ATA\\n\n".
+		"### trivolver terminated.\n\n";
 }
 
 unless($branch_unit =~ /\d/) {
-	die "\nWARNING: A valid --branch_unit option must be provided: branch lengths will be multiplied by this value and rounded up to the nearest integer to determine number of generations\n".
-		"SNPGenie terminated.\n\n";
+	die "\n### WARNING: A valid --branch_unit option must be provided: branch lengths will be multiplied by this value and rounded up to the nearest integer to determine number of generations\n".
+		"### trivolver terminated.\n\n";
 }
 
-print "\n################################################################################".
+print "################################################################################".
 	"\n##                                                                            ##".
 	"\n##               Evolution On Tree Using Custom Rates Initiated!              ##".
 	"\n##                                                                            ##".
@@ -82,7 +84,7 @@ print "\n#######################################################################
 
 print "\nAnalysis initiated at local time $local_time1\n";
 
-print "COMMAND: trivolver.pl @commands\n";
+print "\nCOMMAND: trivolver.pl @commands\n";
 
 ##########################################################################################
 # Generate or assign random seed value
@@ -118,8 +120,10 @@ if($tree =~/(.+)\..+/) {
 
 open(IN_TREE, "$tree") or die "Could not open file $tree\n";
 
-print "\n################################################################################";
-print "\nRecording tree from $tree...\n";
+if ($verbose) {
+	print "\n################################################################################";
+	print "\nRecording tree from $tree...\n";
+}
 
 my $tree = '';
 
@@ -160,8 +164,10 @@ my $seq_num = 0;
 
 open(IN_FASTA, "$seed_sequence") or die "Could not open file $seed_sequence\n";
 
-print "\n################################################################################";
-print "\nRecording seed sequence data from $seed_sequence...\n";
+if($verbose) {
+	print "\n################################################################################";
+	print "\nRecording seed sequence data from $seed_sequence...\n";
+}
 
 while(<IN_FASTA>) {
 	chomp;
@@ -205,14 +211,16 @@ my @ordered_trinucleotides = qw/AAA AAC AAG AAT
 
 open(IN_RATE_MATRIX, "$rate_matrix") or die "Could not open file $rate_matrix\n";
 
-print "\n################################################################################";
-print "\nRecording rate matrix from $rate_matrix...\n";
+if ($verbose) {
+	print "\n################################################################################";
+	print "\nRecording rate matrix from $rate_matrix...\n";
+}
 
 my $row_index = 0;
 
 while(<IN_RATE_MATRIX>) {
 	chomp;
-	if(/([0-9\.eE\-]+)\s+([0-9\.eE\-]+)\s+([0-9\.eE\-]+)\s+([0-9\.eE\-]+)$/) { # in case there's a header or a column of names in front
+	if (/([0-9\.eE\-]+)\s+([0-9\.eE\-]+)\s+([0-9\.eE\-]+)\s+([0-9\.eE\-]+)$/) { # in case there's a header or a column of names in front
 		$rate_matrix{$ordered_trinucleotides[$row_index]}->{'A'} = $1;
 		$rate_matrix{$ordered_trinucleotides[$row_index]}->{'C'} = $2;
 		$rate_matrix{$ordered_trinucleotides[$row_index]}->{'G'} = $3;
@@ -225,16 +233,18 @@ while(<IN_RATE_MATRIX>) {
 close IN_RATE_MATRIX;
 
 unless($row_index == 64) { # i.e., one more than the last real index
-	die "\nWARNING: There must be 64 rows X 4 columns of data in the rate matrix.\n".
-		"SNPGenie terminated.\n\n";
+	die "\n### WARNING: There must be 64 rows X 4 columns of data in the rate matrix.\n".
+		"### trivolver terminated.\n\n";
 }
 
 
 ##########################################################################################
 # STORE THE TREE AS A MULTIDMINENSIONAL HASH
 
-print "\n################################################################################\n";
-print "Recursively trivolving sequences from the root...\n";
+if ($verbose) {
+	print "\n################################################################################\n";
+	print "Recursively trivolving sequences from the root...\n";
+}
 
 # Examples
 # (1:0.000318866,(2:0.000105140,3:0.000105140):0.000213725);
@@ -305,12 +315,14 @@ my %tree;
 
 my $num_mutations = 0;
 my $generations_elapsed = 0;
+my $total_branch_length = 0;
+my $branch_to_tip_length = 0;
 my %mutation_history; # mutations will be comma(',')-separated as <GEN><AA><SITE><DA>
 my %taxa_histories;
 
-print "ANCESTRAL SEQUENCE:\n$seed_seq\n";
+print "\nANCESTRAL SEQUENCE: $seed_seq\n";
 
-print "STARTING TREE:\n$tree\n\n";
+print "\nTREE: $tree\n";
 
 #my $curr_sequence = $seed_seq;
 &evolve_two_subtrees($tree, $generations_elapsed, \%mutation_history);
@@ -322,9 +334,11 @@ sub evolve_two_subtrees {
 	my($tree, $generations_elapsed, $mutation_history_ref) = @_;
 	my %mutation_history = %$mutation_history_ref;
 	
-	print "\n##########################################################################################\n";
-	print "Generations elapsed: " . sprintf("%.3f", $generations_elapsed) . "\n";
-	print "tree: $tree\n";
+	if ($verbose) {
+		print "\n##########################################################################################\n";
+		print "Generations elapsed: " . sprintf("%.3f", $generations_elapsed) . "\n";
+		print "tree: $tree\n";
+	}
 	
 	# Construct the current state of the sequence given the evolutionary history
 	# Perhaps not quite as time-efficient, but MUCH MORE MEMORY EFFICIENT.
@@ -350,8 +364,7 @@ sub evolve_two_subtrees {
 			$tree_stripped =~ s/\)$//; # remove last closing parentheses
 		}
 		
-		# what's left of the tree, moving inward
-		print "tree_stripped: $tree_stripped\n";
+		if ($verbose) { print "tree_stripped: $tree_stripped\n" }
 		
 		#my $pattern = 0;
 		
@@ -393,8 +406,7 @@ sub evolve_two_subtrees {
 				# pattern 1 with a SINGLE internal pair
 				# (1) (-----):0.01
 				
-				print "pattern 1a: (-----):0.01\n";
-				#die "pattern 1\n";
+				if ($verbose) { print "pattern 1a: (-----):0.01\n" }
 				
 				#$pattern = 1;
 				
@@ -415,8 +427,7 @@ sub evolve_two_subtrees {
 				# pattern 5 with a single naked pair
 				# (5) A:0.01,B:0.01
 				
-				print "pattern 5: A:0.01,B:0.01\n";
-				#die "pattern 5\n";
+				if ($verbose) { print "pattern 5: A:0.01,B:0.01\n" }
 				
 				#$pattern = 5;
 				
@@ -430,13 +441,13 @@ sub evolve_two_subtrees {
 					
 					($subtree1, $subtree2) = sort($subtree1, $subtree2);
 					
-					print "subtree1: $subtree1\nsubtree2: $subtree2\n";
+					if ($verbose) { print "subtree1: $subtree1\nsubtree2: $subtree2\n" }
 					
 					# Recursively evolve subtrees
-					print "Analyzing subtree1...\n";
+					if ($verbose) { print "Analyzing subtree1...\n" }
 					&evolve_two_subtrees($subtree1, $generations_elapsed, \%mutation_history);
 					
-					print "Analyzing subtree2...\n";
+					if ($verbose) { print "Analyzing subtree2...\n" }
 					&evolve_two_subtrees($subtree2, $generations_elapsed, \%mutation_history);
 					
 					return;
@@ -497,7 +508,7 @@ sub evolve_two_subtrees {
 					
 					$split_index--;
 					
-					print "FINAL split_index=$split_index\n";
+					if($verbose) { print "FINAL split_index=$split_index\n" }
 					last IDENTIFY_SUBTREES;
 				}
 			}
@@ -550,8 +561,9 @@ sub evolve_two_subtrees {
 
 			# Calculate number of generations on the branch
 			my $generations = $branch_length * $branch_unit;
+			$total_branch_length += $generations;
 			#$generations = $generations;
-			print "generations to evolve on ancestral branch: " . sprintf("%.3f", $generations) . "\n";
+			if($verbose) { print "generations to evolve on ancestral branch: " . sprintf("%.3f", $generations) . "\n" }
 			
 			# Tally all trinucleotides in sequence; first and last nucleotides ignored.
 			my %trint_counts;
@@ -570,7 +582,7 @@ sub evolve_two_subtrees {
 				$mut_rate_overall += ($trint_counts{$_} * $rate_row_sum);
 			}
 			
-			print "starting mutation rate=$mut_rate_overall\n";
+			if($verbose) { print "starting mutation rate=$mut_rate_overall\n" }
 	#		print "mut_rate_mean=$mut_rate_mean\n";
 			# when all rates were 1e-7 (file SLiM_example_rate2.txt), this was 
 			#mut_rate_overall=0.0299994
@@ -609,15 +621,24 @@ sub evolve_two_subtrees {
 					
 					foreach my $nt (qw/A C G T/) {
 						#print "nt=$nt\n";
-						$curr_rate_max += $rate_matrix{$trint}->{$nt};
+						my $this_rate = $rate_matrix{$trint}->{$nt};
+						$curr_rate_max += $this_rate;
 						
-						if ($rand_number2 < $curr_rate_max) { # this one was it!
+						if ($rand_number2 < $curr_rate_max && $this_rate > 0) { # this one was it!
 	#						print "MUTATION! $trint" . ($seq_index + 1);
 							$mutation_site_index = $seq_index + 1;
 							
 							# Prev and next overlapping trinucleotides
-							$prev_trint_AA = substr($curr_sequence, $seq_index - 1, 3);
-							$next_trint_AA = substr($curr_sequence, $seq_index + 1, 3);
+							
+							# don't look at prev trint for FIRST trint
+							unless($seq_index == 0) {
+								$prev_trint_AA = substr($curr_sequence, $seq_index - 1, 3);
+							}
+							
+							# don't look at next trint for LAST trint
+							unless(($seq_index + 3) >= length($curr_sequence)) {
+								$next_trint_AA = substr($curr_sequence, $seq_index + 1, 3);
+							}
 							
 							$trint_AA = $trint;
 							$nt_AA = substr($trint, 1, 1, $nt); # returns what was there before replacement
@@ -626,8 +647,15 @@ sub evolve_two_subtrees {
 							$trint_DA = $trint;
 							$nt_DA = $nt;
 							
-							$prev_trint_DA = substr($prev_trint_AA, 2, 1, $nt);
-							$next_trint_DA = substr($next_trint_AA, 0, 1, $nt);
+							# don't look at prev trint for FIRST trint
+							unless($seq_index == 0) {
+								$prev_trint_DA = substr($prev_trint_AA, 2, 1, $nt);
+							}
+							
+							# don't look at next trint for LAST trint
+							unless(($seq_index + 3) >= length($curr_sequence)) {
+								$next_trint_DA = substr($next_trint_AA, 0, 1, $nt);
+							}
 							
 							# change state of actual sequence
 							substr($curr_sequence, $mutation_site_index, 1, $nt);
@@ -649,7 +677,11 @@ sub evolve_two_subtrees {
 					$mutation_site_index = (length($curr_sequence) - 2);
 					
 					# Prev and next overlapping trinucleotides
-					$prev_trint_AA = substr($curr_sequence, (length($curr_sequence) - 4), 3);
+					
+					# don't look at prev trint for FIRST trint
+					unless(length($curr_sequence) == 3) {
+						$prev_trint_AA = substr($curr_sequence, (length($curr_sequence) - 4), 3);
+					}
 					# NO NEXT TRINUCLEOTIDE!
 					
 					$trint_AA = $trint;
@@ -660,7 +692,10 @@ sub evolve_two_subtrees {
 					$trint_DA = $trint;
 					$nt_DA = 'T';
 					
-					$prev_trint_DA = substr($prev_trint_AA, 2, 1, 'T');
+					# don't look at prev trint for FIRST trint
+					unless(length($curr_sequence) == 3) {
+						$prev_trint_DA = substr($prev_trint_AA, 2, 1, 'T');
+					}
 					# NO NEXT TRINUCLEOTIDE!
 					
 					# change state of actual sequence
@@ -746,7 +781,7 @@ sub evolve_two_subtrees {
 			# Add the remaining time in which mutation DIDN'T occur.
 			$generations_elapsed += $generations;
 			
-			print "evolution of node complete; generations_elapsed=" . sprintf("%.3f", $generations_elapsed) . "\n";
+			if($verbose) { print "evolution of node complete; generations_elapsed=" . sprintf("%.3f", $generations_elapsed) . "\n" }
 ##			print "mutation_history:\n";
 ##			
 ##			foreach my $mutated_site (sort {$a <=> $b} keys %mutation_history) {
@@ -758,10 +793,10 @@ sub evolve_two_subtrees {
 #		##	print "mut_rate_overall=$final_mutation_rate\n"; # wasn't final because wasn't updated since last mutation
 #		#	print "\n";
 			
-			print "now submitting internal node for evolution:\ninternal_node=$internal_node\nbranch_length=$branch_length\n";
+			if($verbose) { print "now submitting internal node for evolution:\ninternal_node=$internal_node\nbranch_length=$branch_length\n" }
 			
 			# Recursively evolve subtrees
-			print "Analyzing internal_node...\n";
+			if($verbose) { print "Analyzing internal_node...\n" }
 			&evolve_two_subtrees($internal_node, $generations_elapsed, \%mutation_history);
 			
 		##################################################################################
@@ -769,7 +804,7 @@ sub evolve_two_subtrees {
 		##################################################################################
 		} elsif (length($subtree1) > 1 && length($subtree2) > 1 && length($internal_node) == 0 && length($branch_length) == 0) { # CONTAINS PARENTHESES
 		#} elsif ($tree_stripped =~ /(^\(.+\):[0-9\.eE\-]+),(\(.+\):[0-9\.eE\-]+$)/) { # NOT TESTED
-			print "pattern 2: (-----):0.01,(-----):0.01\n";
+			if($verbose) { print "pattern 2: (-----):0.01,(-----):0.01\n" }
 			#die "pattern 2\n";
 			
 			
@@ -786,13 +821,13 @@ sub evolve_two_subtrees {
 			
 			($subtree1, $subtree2) = sort($subtree1, $subtree2);
 			
-			print "subtree1: $subtree1\nsubtree2: $subtree2\n";
+			if($verbose) { print "subtree1: $subtree1\nsubtree2: $subtree2\n" }
 			
 			# Recursively evolve subtrees
-			print "Analyzing subtree1...\n";
+			if($verbose) { print "Analyzing subtree1...\n" }
 			&evolve_two_subtrees($subtree1, $generations_elapsed, \%mutation_history);
 			
-			print "Analyzing subtree2...\n";
+			if($verbose) { print "Analyzing subtree2...\n" }
 			&evolve_two_subtrees($subtree2, $generations_elapsed, \%mutation_history);
 		
 		##################################################################################
@@ -820,12 +855,13 @@ sub evolve_two_subtrees {
 		
 #		die "Might we have a wen ti? #4.\n";
 		
-		print "ANALYZING A TERMINAL TAXON: $taxon\n";
+		if($verbose) { print "ANALYZING A TERMINAL TAXON: $taxon\n" }
 		
 		# Calculate number of generations on the branch
 		my $generations = $branch_length * $branch_unit;
+		$total_branch_length += $generations;
 		#$generations = ($generations + 1);
-		print "Generations on branch: " . sprintf("%.3f", $generations) . "\n";
+		if($verbose) { print "Generations on branch: " . sprintf("%.3f", $generations) . "\n" }
 		
 		# Tally all trinucleotides in sequence; first and last nucleotides ignored.
 		my %trint_counts;
@@ -852,7 +888,7 @@ sub evolve_two_subtrees {
 	#		$final_mutation_rate = $mut_rate_overall;
 	#		my $mut_rate_mean = $mut_rate_overall / $trint_counts_sum;
 		
-		print "starting mutation rate=$mut_rate_overall\n";
+		if($verbose) { print "starting mutation rate=$mut_rate_overall\n" }
 	#		print "mut_rate_mean=$mut_rate_mean\n";
 		# when all rates were 1e-7 (file SLiM_example_rate2.txt), this was 
 		#mut_rate_overall=0.0299994
@@ -898,8 +934,16 @@ sub evolve_two_subtrees {
 						$mutation_site_index = $seq_index + 1;
 						
 						# Prev and next overlapping trinucleotides
-						$prev_trint_AA = substr($curr_sequence, $seq_index - 1, 3);
-						$next_trint_AA = substr($curr_sequence, $seq_index + 1, 3);
+						
+						# don't look at prev trint for FIRST trint
+						unless($seq_index == 0) {
+							$prev_trint_AA = substr($curr_sequence, $seq_index - 1, 3);
+						}
+						
+						# don't look at next trint for LAST trint
+						unless(($seq_index + 3) >= length($curr_sequence)) {
+							$next_trint_AA = substr($curr_sequence, $seq_index + 1, 3);
+						}
 						
 						$trint_AA = $trint;
 						$nt_AA = substr($trint, 1, 1, $nt); # returns what was there before replacement
@@ -908,8 +952,15 @@ sub evolve_two_subtrees {
 						$trint_DA = $trint;
 						$nt_DA = $nt;
 						
-						$prev_trint_DA = substr($prev_trint_AA, 2, 1, $nt);
-						$next_trint_DA = substr($next_trint_AA, 0, 1, $nt);
+						# don't look at prev trint for FIRST trint
+						unless($seq_index == 0) {
+							$prev_trint_DA = substr($prev_trint_AA, 2, 1, $nt);
+						}
+						
+						# don't look at next trint for LAST trint
+						unless(($seq_index + 3) >= length($curr_sequence)) {
+							$next_trint_DA = substr($next_trint_AA, 0, 1, $nt);
+						}
 						
 						# change state of actual sequence
 						substr($curr_sequence, $mutation_site_index, 1, $nt);
@@ -931,7 +982,12 @@ sub evolve_two_subtrees {
 				$mutation_site_index = (length($curr_sequence) - 2);
 				
 				# Prev and next overlapping trinucleotides
-				$prev_trint_AA = substr($curr_sequence, (length($curr_sequence) - 4), 3);
+				
+				# don't look at prev trint for FIRST trint
+				unless(length($curr_sequence) == 3) {
+					$prev_trint_AA = substr($curr_sequence, (length($curr_sequence) - 4), 3);
+				}
+				
 				# NO NEXT TRINUCLEOTIDE!
 				
 				$trint_AA = $trint;
@@ -942,7 +998,11 @@ sub evolve_two_subtrees {
 				$trint_DA = $trint;
 				$nt_DA = 'T';
 				
-				$prev_trint_DA = substr($prev_trint_AA, 2, 1, 'T');
+				# don't look at prev trint for FIRST trint
+				unless(length($curr_sequence) == 3) {
+					$prev_trint_DA = substr($prev_trint_AA, 2, 1, 'T');
+				}
+				
 				# NO NEXT TRINUCLEOTIDE!
 				
 				# change state of actual sequence
@@ -1008,7 +1068,13 @@ sub evolve_two_subtrees {
 		# Add the remaining time in which mutation DIDN'T occur.
 		$generations_elapsed += $generations;
 		
-		print "evolution of terminal taxon complete; generations_elapsed=" . sprintf("%.3f", $generations_elapsed) . "\n";
+		if($branch_to_tip_length == 0) {
+			$branch_to_tip_length = $generations_elapsed;
+		} elsif (int($branch_to_tip_length) != int($generations_elapsed)) {
+			die "\n### WARNING: conflicting branch-to-tip length measures for taxon $taxon\: $branch_to_tip_length vs. $generations_elapsed\. TERMINATED.\n\n";
+		}
+		
+		if($verbose) { print "evolution of terminal taxon complete; generations_elapsed=" . sprintf("%.3f", $generations_elapsed) . "\n" }
 #		print "tree: $tree\n";
 		
 		# STORE TAXON HISTORY
@@ -1025,13 +1091,18 @@ sub evolve_two_subtrees {
 }
 
 
-print "num_mutations = $num_mutations\n\n";
+print "\ntotal number of mutations on all branches = $num_mutations\n";
+print "\ntotal branch length (generations) = $total_branch_length\n";
+print "\nbranch-to-tip length (generations) = $branch_to_tip_length\n";
+print "\nlength of run in seconds = " . (time - $time1) . "\n\n";
 
 print "\n#########################################################################################\n";
-print "\n# RESULTS:\n";
-print "\n#########################################################################################\n";
+print "# RESULTS:\n";
+print "#########################################################################################\n";
 
-print "\nnum_mutations=$num_mutations\n\n";
+print "\nnum_mutations=$num_mutations\n";
+
+print "\n//\n";
 
 print "taxon\tsite\tmutations\n";
 foreach my $taxon (sort {$a <=> $b} keys %taxa_histories) {
@@ -1039,12 +1110,6 @@ foreach my $taxon (sort {$a <=> $b} keys %taxa_histories) {
 		print "$taxon\t$mutated_site\t" . $taxa_histories{$taxon}->{$mutated_site} . "\n";
 	}
 }
-
-print "\n#########################################################################################\n";
-print "\n# END OF RESULTS\n";
-print "\n#########################################################################################\n";
-
-print "\nlength of run: " . (time - $time1) . "\n\n";
 
 
 
