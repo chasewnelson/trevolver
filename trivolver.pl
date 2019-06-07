@@ -324,11 +324,47 @@ print "\nANCESTRAL SEQUENCE: $seed_seq\n";
 
 print "\nTREE: $tree\n";
 
-#my $curr_sequence = $seed_seq;
+##########################################################################################
+# THE SIMULATION: recursive evolution approach using the subroutine &evolve_two_subtrees()
+##########################################################################################
 &evolve_two_subtrees($tree, $generations_elapsed, \%mutation_history);
 
+
 ##########################################################################################
-# Recursive evolution approach
+# PRINT RESULTS
+##########################################################################################
+
+print "\n\n#########################################################################################\n";
+print "# SUMMARY OF RESULTS:\n";
+print "#########################################################################################\n";
+
+print "\ntotal number of mutations on all branches: $num_mutations\n";
+print "\ntotal branch length (generations): $total_branch_length\n";
+print "\nbranch-to-tip length (generations): $branch_to_tip_length\n";
+print "\ntotal number of mutations occurred: $num_mutations\n";
+print "\nlength of run in seconds: " . (time - $time1) . "\n\n";
+
+print "\n#########################################################################################\n";
+print "# MUTATION RESULTS:\n";
+print "#########################################################################################\n";
+
+print "\n//\n";
+
+print "taxon\tsite\tmutations\n";
+foreach my $taxon (sort {$a <=> $b} keys %taxa_histories) {
+	foreach my $mutated_site (sort {$a <=> $b} keys %{$taxa_histories{$taxon}}) {
+		print "$taxon\t$mutated_site\t" . $taxa_histories{$taxon}->{$mutated_site} . "\n";
+	}
+}
+
+exit;
+
+
+##########################################################################################
+##########################################################################################
+### SUBROUTINE: recursive evolution approach
+##########################################################################################
+##########################################################################################
 sub evolve_two_subtrees {
 	
 	my($tree, $generations_elapsed, $mutation_history_ref) = @_;
@@ -406,7 +442,7 @@ sub evolve_two_subtrees {
 				# pattern 1 with a SINGLE internal pair
 				# (1) (-----):0.01
 				
-				if ($verbose) { print "pattern 1a: (-----):0.01\n" }
+				if ($verbose) { print "pattern 1a: (A:0.01,B:0.01):0.01\n" }
 				
 				#$pattern = 1;
 				
@@ -508,7 +544,7 @@ sub evolve_two_subtrees {
 					
 					$split_index--;
 					
-					if($verbose) { print "FINAL split_index=$split_index\n" }
+					if($verbose) { print "FINAL string index at which to split tree: $split_index\n" }
 					last IDENTIFY_SUBTREES;
 				}
 			}
@@ -563,7 +599,7 @@ sub evolve_two_subtrees {
 			my $generations = $branch_length * $branch_unit;
 			$total_branch_length += $generations;
 			#$generations = $generations;
-			if($verbose) { print "generations to evolve on ancestral branch: " . sprintf("%.3f", $generations) . "\n" }
+			if($verbose) { print "pattern 1: (-----):0.01\ngenerations to evolve on ancestral branch: " . sprintf("%.3f", $generations) . "\n" }
 			
 			# Tally all trinucleotides in sequence; first and last nucleotides ignored.
 			my %trint_counts;
@@ -582,7 +618,7 @@ sub evolve_two_subtrees {
 				$mut_rate_overall += ($trint_counts{$_} * $rate_row_sum);
 			}
 			
-			if($verbose) { print "starting mutation rate=$mut_rate_overall\n" }
+			if($verbose) { print "starting mutation rate: $mut_rate_overall\n" }
 	#		print "mut_rate_mean=$mut_rate_mean\n";
 			# when all rates were 1e-7 (file SLiM_example_rate2.txt), this was 
 			#mut_rate_overall=0.0299994
@@ -781,7 +817,7 @@ sub evolve_two_subtrees {
 			# Add the remaining time in which mutation DIDN'T occur.
 			$generations_elapsed += $generations;
 			
-			if($verbose) { print "evolution of node complete; generations_elapsed=" . sprintf("%.3f", $generations_elapsed) . "\n" }
+			if($verbose) { print "evolution of node complete; generations_elapsed: " . sprintf("%.3f", $generations_elapsed) . "\n" }
 ##			print "mutation_history:\n";
 ##			
 ##			foreach my $mutated_site (sort {$a <=> $b} keys %mutation_history) {
@@ -793,7 +829,7 @@ sub evolve_two_subtrees {
 #		##	print "mut_rate_overall=$final_mutation_rate\n"; # wasn't final because wasn't updated since last mutation
 #		#	print "\n";
 			
-			if($verbose) { print "now submitting internal node for evolution:\ninternal_node=$internal_node\nbranch_length=$branch_length\n" }
+			if($verbose) { print "now submitting internal node for evolution:\ninternal_node: $internal_node\n" }
 			
 			# Recursively evolve subtrees
 			if($verbose) { print "Analyzing internal_node...\n" }
@@ -888,7 +924,7 @@ sub evolve_two_subtrees {
 	#		$final_mutation_rate = $mut_rate_overall;
 	#		my $mut_rate_mean = $mut_rate_overall / $trint_counts_sum;
 		
-		if($verbose) { print "starting mutation rate=$mut_rate_overall\n" }
+		if($verbose) { print "starting mutation rate: $mut_rate_overall\n" }
 	#		print "mut_rate_mean=$mut_rate_mean\n";
 		# when all rates were 1e-7 (file SLiM_example_rate2.txt), this was 
 		#mut_rate_overall=0.0299994
@@ -1074,7 +1110,7 @@ sub evolve_two_subtrees {
 			die "\n### WARNING: conflicting branch-to-tip length measures for taxon $taxon\: $branch_to_tip_length vs. $generations_elapsed\. TERMINATED.\n\n";
 		}
 		
-		if($verbose) { print "evolution of terminal taxon complete; generations_elapsed=" . sprintf("%.3f", $generations_elapsed) . "\n" }
+		if($verbose) { print "evolution of terminal taxon complete; generations_elapsed: " . sprintf("%.3f", $generations_elapsed) . "\n" }
 #		print "tree: $tree\n";
 		
 		# STORE TAXON HISTORY
@@ -1088,28 +1124,9 @@ sub evolve_two_subtrees {
 		
 	} # END BASE CASE: a terminal taxon
 	
-}
+} # END SUBROUTINE
 
-
-print "\ntotal number of mutations on all branches = $num_mutations\n";
-print "\ntotal branch length (generations) = $total_branch_length\n";
-print "\nbranch-to-tip length (generations) = $branch_to_tip_length\n";
-print "\nlength of run in seconds = " . (time - $time1) . "\n\n";
-
-print "\n#########################################################################################\n";
-print "# RESULTS:\n";
-print "#########################################################################################\n";
-
-print "\nnum_mutations=$num_mutations\n";
-
-print "\n//\n";
-
-print "taxon\tsite\tmutations\n";
-foreach my $taxon (sort {$a <=> $b} keys %taxa_histories) {
-	foreach my $mutated_site (sort {$a <=> $b} keys %{$taxa_histories{$taxon}}) {
-		print "$taxon\t$mutated_site\t" . $taxa_histories{$taxon}->{$mutated_site} . "\n";
-	}
-}
+exit;
 
 
 
