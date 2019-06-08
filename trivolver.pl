@@ -45,7 +45,7 @@ my $rate_matrix; # file containing 64 x 4 tab-delimited rate matrix in alphabeti
 my $branch_unit; # branch lengths will be multiplied by this value and rounded up to the nearest integer to determine number of generations
 my $random_seed; # integer with which to seed the random number generator
 my $tracked_motif;
-my $track_rate;
+my $track_mutations;
 my $verbose;
 
 # Get user input, if given. If a Boolean argument is passed, its value is 1; else undef
@@ -55,11 +55,11 @@ GetOptions( "tree=s" => \$tree,
 			"branch_unit=f" => \$branch_unit,
 			"random_seed=i" => \$random_seed,
 			"tracked_motif=s" => \$tracked_motif,
-			"track_rate" => \$track_rate,
+			"track_mutations" => \$track_mutations,
 			"verbose" => \$verbose
 			)
 			
-			or die "\n### WARNING: Error in command line arguments. Script terminated.\n\n";
+			or print_usage_message("### WARNING: Error in command line arguments (option misspelled?). trivolver terminated.");
 
 
 unless(-f "$tree") {
@@ -377,7 +377,7 @@ print "\nTREE: $tree\n";
 ##########################################################################################
 # THE SIMULATION: recursive evolution approach using the subroutine &evolve_two_subtrees()
 ##########################################################################################
-evolve_two_subtrees($tree, 0, 'n1=root,');
+evolve_two_subtrees($tree, 0, 0, 'n1=root,');
 
 
 ##########################################################################################
@@ -407,13 +407,13 @@ foreach my $taxon (sort {$a <=> $b} keys %taxa_histories) {
 	}
 }
 
-if($track_rate || $tracked_motif) {
+if($track_mutations || $tracked_motif) {
 	print "\n//TRACKED\n";
 
 	my $out_line = "lineage\tgeneration\t";
 	
-	if ($track_rate) { $out_line .= "rate\t" }
-	if ($tracked_motif) { $out_line .= "motif\t" }
+	if ($track_mutations) { $out_line .= "mutation_rate\tmutation_count\t" }
+	if ($tracked_motif) { $out_line .= "motif_count\t" }
 	chop($out_line);
 	print "$out_line\n";
 	$out_line = '';
@@ -426,11 +426,12 @@ if($track_rate || $tracked_motif) {
 			$out_line .= "\t$generations_elapsed\t";
 			
 			if ($generational_histories{$these_nodes}->{$generations_elapsed}->{rate}) {
-				$out_line .= $generational_histories{$these_nodes}->{$generations_elapsed}->{rate} . "\t";
+				$out_line .= $generational_histories{$these_nodes}->{$generations_elapsed}->{rate} . 
+				"\t" . $generational_histories{$these_nodes}->{$generations_elapsed}->{count} . "\t";
 			}
 			
 			foreach my $motif (sort keys %{$generational_histories{$these_nodes}->{$generations_elapsed}}) {
-				if ($motif ne 'rate' && $motif ne 'nodes' && $motif ne '') {
+				if ($motif ne 'rate' && $motif ne 'nodes' && $motif ne 'count' && $motif ne '') {
 					$out_line .= $generational_histories{$these_nodes}->{$generations_elapsed}->{$motif} . ",";
 				}
 			}
@@ -453,7 +454,7 @@ exit;
 ##########################################################################################
 sub evolve_two_subtrees {
 	
-	my($tree, $generations_elapsed, $nodes, $mutation_history_ref) = @_;
+	my($tree, $generations_elapsed, $mutation_count, $nodes, $mutation_history_ref) = @_;
 	print "We got the arguments: @_\n";
 	
 	my %mutation_history;
@@ -583,13 +584,11 @@ sub evolve_two_subtrees {
 					if ($verbose) { print "subtree1: $subtree1\nsubtree2: $subtree2\n" }
 					
 					# Recursively evolve subtrees
-					my %mutation_history_copy = %mutation_history;
-					
 					if ($verbose) { print "Analyzing subtree1...\n" }
-					evolve_two_subtrees($subtree1, $generations_elapsed, $nodes, \%mutation_history);
+					evolve_two_subtrees($subtree1, $generations_elapsed, $mutation_count, $nodes, \%mutation_history);
 					
 					if ($verbose) { print "Analyzing subtree2...\n" }
-					evolve_two_subtrees($subtree2, $generations_elapsed, $nodes, \%mutation_history_copy);
+					evolve_two_subtrees($subtree2, $generations_elapsed, $mutation_count, $nodes, \%mutation_history);
 					
 					return;
 				}
@@ -746,11 +745,12 @@ sub evolve_two_subtrees {
 			
 			# Here's the issue: EACH "generations elapsed" is UNIQUE, so of course we'll only store one value per.
 			if ($verbose) { print "starting mutation rate: $mut_rate_overall\n" }
-#			if($generations_elapsed == 0 && ($track_rate || $tracked_motif)) {
+#			if($generations_elapsed == 0 && ($track_mutations || $tracked_motif)) {
 #				$generational_histories{$generations_elapsed}->{nodes} .= "$node_id\,";
 #			}
-			if ($generations_elapsed == 0 && $track_rate) {
+			if ($generations_elapsed == 0 && $track_mutations) {
 				$generational_histories{$nodes}->{$generations_elapsed}->{rate} = $mut_rate_overall;
+				$generational_histories{$nodes}->{$generations_elapsed}->{count} = $mutation_count;
 			}
 			if ($generations_elapsed == 0 && $tracked_motif) {
 				my @motifs_overlapping = ($curr_sequence =~ /(?=$tracked_motif)/g); # ?= means overlapping matches
@@ -772,7 +772,8 @@ sub evolve_two_subtrees {
 	#		print "waiting_time=$waiting_time\n";
 			
 			while ($waiting_time < $generations) { # a new mutation!
-				$num_mutations++;
+				$num_mutations++; # global
+				$mutation_count++; # lineage-specific
 				
 				# which site and nucleotide change?
 				my $rand_number2 = rand($mut_rate_overall);
@@ -927,11 +928,12 @@ sub evolve_two_subtrees {
 				
 				print "; new mutation rate: $mut_rate_overall\n";
 				
-#				if ($track_rate || $tracked_motif) { 
+#				if ($track_mutations || $tracked_motif) { 
 #					$generational_histories{$generations_elapsed}->{nodes} .= "$node_id\,";
 #				}
-				if ($track_rate) { 
+				if ($track_mutations) { 
 					$generational_histories{$nodes}->{$generations_elapsed}->{rate} = $mut_rate_overall;
+					$generational_histories{$nodes}->{$generations_elapsed}->{count} = $mutation_count;
 				}
 				if ($tracked_motif) { # COMEBACK that regex work?
 					my @motifs_overlapping = ($curr_sequence =~ /(?=$tracked_motif)/g); # ?= means overlapping matches
@@ -985,7 +987,7 @@ sub evolve_two_subtrees {
 			#my %mutation_history_copy = %mutation_history;
 			
 			if($verbose) { print "Analyzing internal_node...\n" }
-			evolve_two_subtrees($internal_node, $generations_elapsed, $nodes, \%mutation_history);
+			evolve_two_subtrees($internal_node, $generations_elapsed, $mutation_count, $nodes, \%mutation_history);
 			
 		##################################################################################
 		### SUBTREE PATTERN
@@ -1012,13 +1014,11 @@ sub evolve_two_subtrees {
 			if($verbose) { print "subtree1: $subtree1\nsubtree2: $subtree2\n" }
 			
 			# Recursively evolve subtrees
-			my %mutation_history_copy = %mutation_history;
-			
 			if($verbose) { print "Analyzing subtree1...\n" }
-			evolve_two_subtrees($subtree1, $generations_elapsed, $nodes, \%mutation_history);
+			evolve_two_subtrees($subtree1, $generations_elapsed, $mutation_count, $nodes, \%mutation_history);
 			
 			if($verbose) { print "Analyzing subtree2...\n" }
-			evolve_two_subtrees($subtree2, $generations_elapsed, $nodes, \%mutation_history_copy);
+			evolve_two_subtrees($subtree2, $generations_elapsed, $mutation_count, $nodes, \%mutation_history);
 		
 		##################################################################################
 		## NO RECOGNIZABLE PATTERN: ABORT!
@@ -1113,7 +1113,8 @@ sub evolve_two_subtrees {
 #		print "waiting_time=$waiting_time\n";
 		
 		while ($waiting_time < $generations) { # a new mutation!
-			$num_mutations++;
+			$num_mutations++; # global
+			$mutation_count++; # lineage-specific
 			
 			# which site and nucleotide change?
 			my $rand_number2 = rand($mut_rate_overall);
@@ -1267,11 +1268,12 @@ sub evolve_two_subtrees {
 			
 			print "; new mutation rate: $mut_rate_overall\n";
 			
-#			if ($track_rate || $tracked_motif) { 
+#			if ($track_mutations || $tracked_motif) { 
 #				$generational_histories{$generations_elapsed}->{nodes} .= "$node_id\,";
 #			}
-			if ($track_rate) { 
+			if ($track_mutations) { 
 				$generational_histories{$nodes}->{$generations_elapsed}->{rate} = $mut_rate_overall;
+				$generational_histories{$nodes}->{$generations_elapsed}->{count} = $mutation_count;
 			}
 			if ($tracked_motif) { # COMEBACK that regex work?
 				my @motifs_overlapping = ($curr_sequence =~ /(?=$tracked_motif)/g); # ?= means overlapping matches
@@ -1329,46 +1331,47 @@ sub print_usage_message {
 	print "\n################################################################################\n";
 	
 	print "\nCALL trivolver.pl USING THE FOLLOWING OPTIONS:\n";
-	print "\n\t--tree (REQUIRED): file containing a bifurcating evolutionary tree in newick\n" . 
-			"\tformat with branch lengths. NO NODE NAMES OR SUPPORT VALUES AT THIS TIME.\n" .
-			"\tOnly the first encountered tree is used.\n";
-	print "\n\t--seed_sequence (REQUIRED): FASTA file containing starting (seed) sequence at\n" . 
-			"\ttree root, to be evolved. Only the first sequence encountered is used.\n";
-	print "\n\t--rate_matrix (REQUIRED): file containing 64 x 4 tab-delimited trinucleotide\n" . 
-			"\trate matrix in alphabetical order. First row values correspond to:\n" . 
-			"\tAAA>AAA   AAA>ACA   AAA>AGA   AAA>ATA\n";
-	print "\n\t--branch_unit (REQUIRED): branch lengths will be multiplied by this value and\n" . 
-			"\trounded up to the nearest integer to determine number of generations.\n";
-	print "\n\t--random_seed (OPTIONAL): integer with which to seed the random number\n" . 
-			"\tgenerator. If not supplied, one will be chosen and reported.\n";
-	print "\n\t--tracked_motif (OPTIONAL): a motif to track after each mutation. For example,\n" . 
-			"\tto report the number of CpG sites over the course of a run, specify CG.\n";
-	print "\n\t--track_rate (OPTIONAL): tell trivolver to report the mutation rate over time.\n";
-	print "\n\t--verbose (OPTIONAL): tell trivolver to tell you EVERYTHING that happens.\n";
+	print "\t--tree (REQUIRED): file containing a bifurcating evolutionary tree in newick\n" . 
+			"\t\tformat with branch lengths. NO NODE NAMES OR SUPPORT VALUES AT THIS TIME.\n" .
+			"\t\tOnly the first encountered tree is used.\n";
+	print "\t--seed_sequence (REQUIRED): FASTA file containing starting (seed) sequence at\n" . 
+			"\t\ttree root, to be evolved. Only the first sequence encountered is used.\n";
+	print "\t--rate_matrix (REQUIRED): file containing 64 x 4 tab-delimited trinucleotide\n" . 
+			"\t\trate matrix in alphabetical order. First row values correspond to:\n" . 
+			"\t\tAAA>AAA   AAA>ACA   AAA>AGA   AAA>ATA\n";
+	print "\t--branch_unit (REQUIRED): branch lengths will be multiplied by this value and\n" . 
+			"\t\trounded up to the nearest integer to determine number of generations.\n";
+	print "\t--random_seed (OPTIONAL): integer with which to seed the random number\n" . 
+			"\t\tgenerator. If not supplied, one will be chosen and reported.\n";
+	print "\t--tracked_motif (OPTIONAL): a motif to track after each mutation. For example,\n" . 
+			"\t\tto report the number of CpG sites over the course of a run, specify CG.\n";
+	print "\t--track_mutations (OPTIONAL): reports the mutation rate and count over time.\n";
+	print "\t--verbose (OPTIONAL): tell trivolver to tell you EVERYTHING that happens.\n";
 		
 	
 	print "\n################################################################################\n";
-	print "EXAMPLES:\n";
+	print "### EXAMPLES:\n";
 	print "################################################################################\n";
 	
 	print "\n### FORMAT:\n";
 	
-	print "\ntrivolver.pl --tree=<newick>.txt --seed_sequence=<seed>.fa --rate_matrix=<64x4>.txt --branch_unit=<#> \\\n" . 
-			"\t--track_rate --tracked_motif=<ACGT> --verbose > output.txt\n";
+	print "\n\ttrivolver.pl --tree=<newick>.txt --seed_sequence=<seed>.fa --rate_matrix=<64x4>.txt \\\n" . 
+			"\t--branch_unit=<#> --track_mutations --tracked_motif=<ACGT> --verbose > output.txt\n";
 	
 	print "\n### EXAMPLE USING ALL OPTIONS:\n";
 	
-	print "\ntrivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt --branch_unit=144740 \\\n" . 
-			"\t--random_seed=123456789 --tracked_motif=CG --track_rate --verbose > my_output.txt\n";
+	print "\n\ttrivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\\n" . 
+			"\t--branch_unit=144740 --random_seed=123456789 --tracked_motif=CG --track_mutations --verbose > my_output.txt\n";
 	
 	print "\n### EXAMPLE OF TYPICAL USAGE (program decides random seed; not verbose):\n";
 	
-	print "\ntrivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt --branch_unit=144740 \\\n" . 
-			"\t--tracked_motif=CG --track_rate > my_output.txt\n";
+	print "\n\ttrivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\\n" . 
+			"\t--branch_unit=144740 --tracked_motif=CG --track_mutations > my_output.txt\n";
 	
-	print "\n### EXAMPLE WITH EVEN FEWER OPTIONS:\n";
+	print "\n### EXAMPLE WITH EVEN FEWER OPTIONS AND OUTPUT TO SCREEN:\n";
 	
-	print "\ntrivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt --branch_unit=144740\n";
+	print "\n\ttrivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\\n" .
+			"\t--branch_unit=144740\n";
 	
 	print "\n################################################################################\n";
 	print "################################################################################\n\n";
