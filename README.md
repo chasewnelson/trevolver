@@ -6,6 +6,8 @@ To test the simulation with the example data, run the following at the Unix comm
 
 `trivolver.pl --tree=test_tree.txt --seed_sequence=HsGgAncestor_chr9_4600001_4610000.fa --rate_matrix=mutation_rates_FAST.txt --branch_unit=144740 > output.txt`
 
+## <a name="examples"></a>Options
+
 Call trivolver using the following options:
 
 * `--tree` (**REQUIRED**): file containing a bifurcating evolutionary tree in newick format with branch lengths. NO NODE NAMES OR SUPPORT VALUES AT THIS TIME. Only the first encountered tree is used.
@@ -23,24 +25,24 @@ Call trivolver using the following options:
 * `--track_mutations` (OPTIONAL): reports the mutation rate and count over time.
 * `--verbose` (OPTIONAL): tell trivolver to tell you EVERYTHING that happens.
 
-## EXAMPLES
+## <a name="examples"></a>EXAMPLES
 
 ### FORMAT:
 
 	trivolver.pl --tree=<newick>.txt --seed_sequence=<seed>.fa --rate_matrix=<64x4>.txt \\ 
 	--branch_unit=<#> --track_mutations --tracked_motif=<ACGT> --verbose > output.txt";
 	
-### EXAMPLE USING ALL OPTIONS:
+### ALL OPTIONS USED:
 
 	trivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\
 	--branch_unit=144740 --random_seed=123456789 --tracked_motif=CG --track_mutations --verbose > my_output.txt
 	
-### EXAMPLE OF TYPICAL USAGE (program decides random seed; not verbose):
+### TYPICAL USAGE (program decides random seed; not verbose):
 
 	trivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\
 	--branch_unit=144740 --tracked_motif=CG --track_mutations > my_output.txt
 
-### EXAMPLE WITH EVEN FEWER OPTIONS AND OUTPUT TO SCREEN:
+### EVEN FEWER OPTIONS AND OUTPUT TO SCREEN:
 
 	trivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\
 	--branch_unit=144740";
