@@ -61,49 +61,29 @@ GetOptions( "tree=s" => \$tree,
 			
 			or die "\n### WARNING: Error in command line arguments. Script terminated.\n\n";
 
+
 unless(-f "$tree") {
-	die "\n### WARNING: A valid --tree option must be provided: file containing bifurcating evolutionary tree with branch lengths. Only first tree used\n".
-		"### trivolver terminated.\n\n";
+	my $specific_warning = "### WARNING: A valid --tree option must be provided.";
+	print_usage_message($specific_warning);
 }
 
 unless(-f "$seed_sequence") {
-	die "\n### WARNING: A valid --seed_sequence option must be provided: file containing starting (seed) sequence at tree root, to be evolved. Only first sequence used\n".
-		"### trivolver terminated.\n\n";
+	my $specific_warning = "### WARNING: A valid --seed_sequence option must be provided.";
+	print_usage_message($specific_warning);
 }
 
 unless(-f "$rate_matrix") {
-	die "\n### WARNING: A valid --rate_matrix option must be provided: file containing 64 x 4 tab-delimited rate matrix in alphabetical order. First row values for: AAA>AAA\\tAAA>ACA\\tAAA>AGA\\tAAA>ATA\\n\n".
-		"### trivolver terminated.\n\n";
+	my $specific_warning = "### WARNING: A valid --rate_matrix option must be provided.";
+	print_usage_message($specific_warning);
 }
 
 unless($branch_unit =~ /\d/) {
-	die "\n### WARNING: A valid --branch_unit option must be provided: branch lengths will be multiplied by this value and rounded up to the nearest integer to determine number of generations\n".
-		"### trivolver terminated.\n\n";
+	my $specific_warning = "### WARNING: A valid --branch_unit option must be provided.";
+	print_usage_message($specific_warning);
 }
 
-print "################################################################################".
-	"\n##                                                                            ##".
-	"\n##               Evolution On Tree Using Custom Rates Initiated!              ##".
-	"\n##                                                                            ##".
-	"\n################################################################################\n";
-
-print "\nAnalysis initiated at local time $local_time1\n";
-
-print "\nCOMMAND: trivolver.pl @commands\n";
-
 ##########################################################################################
-# Generate or assign random seed value
-if($random_seed) {
-	print "\nRANDOM SEED: $random_seed\n";
-	srand($random_seed);
-} else {
-	$random_seed = srand(time ^ $$ ^ unpack "%32L*", `ps wwaxl | gzip`); # (Programming Perl, p. 955)
-	print "\nRANDOM SEED: $random_seed\n";
-}
-
-
-##########################################################################################
-# Extract file prefix
+# Extract tree file prefix
 my $file_prefix;
 if($tree =~/(.+)\..+/) { 
 	$file_prefix = $1 . '_trivolver_results.tsv';
@@ -125,10 +105,10 @@ if($tree =~/(.+)\..+/) {
 
 open(IN_TREE, "$tree") or die "Could not open file $tree\n";
 
-if ($verbose) {
-	print "\n################################################################################";
-	print "\nRecording tree from $tree...\n";
-}
+#if ($verbose) {
+#	print "\n################################################################################";
+#	print "\nRecording tree from $tree...\n";
+#}
 
 my $tree = '';
 
@@ -147,7 +127,8 @@ while(<IN_TREE>) {
 close IN_TREE;
 
 if($tree eq '') {
-	die "\n### WARNING: NO TREE IN TREE FILE. Must begin with '(' and end with ');'. SCRIPT TERMINATED.\n\n";
+	my $specific_warning = "### WARNING: NO TREE IN TREE FILE. Must begin with '(' and end with ');'.";
+	print_usage_message($specific_warning);
 }
 
 # Trim end of tree if ';' or whitespace
@@ -158,14 +139,37 @@ while(substr($tree, -1) =~ /[\s\;]/) {
 #print "\nPROCESSED TREE:\n$tree\n\n";
 
 if($tree =~ /(\,[a-zA-Z0-9\.\-\|\:\']+\,)/) {
-	die "\n### WARNING: TREE MUST BE STRICTLY BIFURCATING BUT CONTAINS A POLYTOMY: \*\*\*$1\*\*\*\. SCRIPT TERMINATED.\n\n";
+	my $specific_warning = "### WARNING: TREE MUST BE STRICTLY BIFURCATING BUT CONTAINS A POLYTOMY: $1";
+	print_usage_message($specific_warning);
+}
+
+if($tree =~ /(\(\,[^\(]*\,\()/) {
+	my $specific_warning = "### WARNING: TREE MUST BE STRICTLY BIFURCATING BUT CONTAINS A POLYTOMY: $1";
+	print_usage_message($specific_warning);
+}
+
+if($tree =~ /(\)\d+)/) {
+	my $specific_warning = "### WARNING: CURRENTLY, SUPPORT VALUES ARE NOT ALLOWED BUT ARE PRESENT: $1";
+	print_usage_message($specific_warning);
+}
+
+if($tree =~ /(\)\[)/) {
+	my $specific_warning = "### WARNING: CURRENTLY, SUPPORT VALUES ARE NOT ALLOWED BUT ARE PRESENT: $1";
+	print_usage_message($specific_warning);
+}
+
+if($tree =~ /(\],)/) {
+	my $specific_warning = "### WARNING: CURRENTLY, SUPPORT VALUES ARE NOT ALLOWED BUT ARE PRESENT: $1";
+	print_usage_message($specific_warning);
 }
 
 my $tree_opening_paren_count = ($tree =~ s/\(/\(/g);
 my $tree_closing_paren_count = ($tree =~ s/\)/\)/g);
 
 unless($tree_opening_paren_count > 0 && $tree_opening_paren_count == $tree_closing_paren_count) {
-	die "\n### WARNING: TREE MUST CONTAIN THE SAME NUMBER OF OPENING (currently $tree_opening_paren_count\) AND CLOSING (currently $tree_closing_paren_count\) PARENTHESES. SCRIPT TERMINATED.\n\n";
+	my $specific_warning = "### WARNING: TREE MUST CONTAIN EQUAL NUMBERS OF OPENING (now $tree_opening_paren_count\) AND CLOSING " . 
+		"(now $tree_closing_paren_count\) PARENTHESES.";
+	print_usage_message($specific_warning);
 }
 
 
@@ -199,6 +203,11 @@ close IN_FASTA;
 $seed_seq = uc($seed_seq);
 $seed_seq =~ tr/U/T/;
 
+unless($seed_seq =~ /[ACGT]/ && length($seed_seq) >= 3) {
+	my $specific_warning = "### WARNING: Sequence does not contain more than two nucleotides (A, C, G, T).";
+	print_usage_message($specific_warning);
+}
+
 
 ##########################################################################################
 # Read in the rate matrix
@@ -229,9 +238,14 @@ if ($verbose) {
 }
 
 my $row_index = 0;
+my $max_whitespaces = 0;
 
 while(<IN_RATE_MATRIX>) {
 	chomp;
+	my $line = $_;
+	my $num_whitespaces = ($line =~ s/(\s+)/$1/g);
+	if($num_whitespaces > $max_whitespaces) { $max_whitespaces = $num_whitespaces }
+	
 	if (/([0-9\.eE\-]+)\s+([0-9\.eE\-]+)\s+([0-9\.eE\-]+)\s+([0-9\.eE\-]+)$/) { # in case there's a header or a column of names in front
 		$rate_matrix{$ordered_trinucleotides[$row_index]}->{'A'} = $1;
 		$rate_matrix{$ordered_trinucleotides[$row_index]}->{'C'} = $2;
@@ -244,9 +258,31 @@ while(<IN_RATE_MATRIX>) {
 
 close IN_RATE_MATRIX;
 
-unless($row_index == 64) { # i.e., one more than the last real index
-	die "\n### WARNING: There must be 64 rows X 4 columns of data in the rate matrix.\n".
-		"### trivolver terminated.\n\n";
+unless($row_index == 64 || $max_whitespaces <= 5) { # i.e., one more than the last real index
+	my $specific_warning = "### WARNING: There must be 64 rows X 4 columns of data in the rate matrix.";
+	print_usage_message($specific_warning);
+}
+
+
+
+print "################################################################################".
+	"\n##                                                                            ##".
+	"\n##               Evolution On Tree Using Custom Rates Initiated!              ##".
+	"\n##                                                                            ##".
+	"\n################################################################################\n";
+
+print "\nAnalysis initiated at local time $local_time1\n";
+
+print "\nCOMMAND: trivolver.pl @commands\n";
+
+##########################################################################################
+# Generate or assign random seed value
+if($random_seed) {
+	print "\nRANDOM SEED: $random_seed\n";
+	srand($random_seed);
+} else {
+	$random_seed = srand(time ^ $$ ^ unpack "%32L*", `ps wwaxl | gzip`); # (Programming Perl, p. 955)
+	print "\nRANDOM SEED: $random_seed\n";
 }
 
 
@@ -670,7 +706,7 @@ sub evolve_two_subtrees {
 			# Construct the current state of the sequence given the evolutionary history
 			# Perhaps not quite as time-efficient, but MUCH MORE MEMORY EFFICIENT.
 			my $curr_sequence = $seed_seq;
-			print "seed=$seed_seq\n";
+			#print "seed=$seed_seq\n";
 			foreach my $mutated_site (sort {$a <=> $b} keys %mutation_history) {
 				my $latest_nt = $mutation_history{$mutated_site};
 				chop($latest_nt); # remove ending comma (,)
@@ -678,7 +714,7 @@ sub evolve_two_subtrees {
 #				print "latest_nt=$latest_nt\n";
 				substr($curr_sequence, $mutated_site - 1, 1, $latest_nt);
 			}
-			print "curr=$curr_sequence\n";
+			#print "curr=$curr_sequence\n";
 			
 			# Calculate number of generations on the branch
 			my $generations = $branch_length * $branch_unit;
@@ -694,10 +730,10 @@ sub evolve_two_subtrees {
 				$trint_counts_sum++;
 			}
 			
-			print "trinucleotide counts, summing to $trint_counts_sum\:\n";
-			foreach (sort keys %trint_counts) {
-				print "$_\=" . $trint_counts{$_} . "\n";
-			}
+			#print "trinucleotide counts, summing to $trint_counts_sum\:\n";
+			#foreach (sort keys %trint_counts) {
+			#	print "$_\=" . $trint_counts{$_} . "\n";
+			#}
 			
 			# Calculate weighted mean mutation rate per generation.
 			my $mut_rate_overall = 0;
@@ -1003,7 +1039,7 @@ sub evolve_two_subtrees {
 		# Construct the current state of the sequence given the evolutionary history
 		# Perhaps not quite as time-efficient, but MUCH MORE MEMORY EFFICIENT.
 		my $curr_sequence = $seed_seq;
-		print "seed=$seed_seq\n";
+		#print "seed=$seed_seq\n";
 		foreach my $mutated_site (sort {$a <=> $b} keys %mutation_history) {
 			my $latest_nt = $mutation_history{$mutated_site};
 			chop($latest_nt); # remove ending comma (,)
@@ -1011,7 +1047,7 @@ sub evolve_two_subtrees {
 #			print "latest_nt=$latest_nt\n";
 			substr($curr_sequence, $mutated_site - 1, 1, $latest_nt);
 		}
-		print "curr=$curr_sequence\n";
+		#print "curr=$curr_sequence\n";
 		
 		my $taxon;
 		my $branch_length;
@@ -1044,10 +1080,10 @@ sub evolve_two_subtrees {
 			$trint_counts_sum++;
 		}
 		
-		print "trinucleotide counts, summing to $trint_counts_sum\:\n";
-		foreach (sort keys %trint_counts) {
-			print "$_\=" . $trint_counts{$_} . "\n";
-		}
+		#print "trinucleotide counts, summing to $trint_counts_sum\:\n";
+		#foreach (sort keys %trint_counts) {
+		#	print "$_\=" . $trint_counts{$_} . "\n";
+		#}
 		
 		# Calculate weighted mean mutation rate per generation.
 		my $mut_rate_overall = 0;
@@ -1271,6 +1307,76 @@ sub evolve_two_subtrees {
 	} # END BASE CASE: a terminal taxon
 	
 } # END SUBROUTINE
+
+
+##########################################################################################
+##########################################################################################
+### SUBROUTINE: TELL THE USER WHAT TO DO
+##########################################################################################
+##########################################################################################
+sub print_usage_message {
+	my ($specific_warning) = @_;
+	
+	print "\n################################################################################".
+		"\n##                                                                            ##".
+		"\n##              trivolver: Evolution On Tree Using Custom Rates!              ##".
+		"\n##                                                                            ##".
+		"\n################################################################################\n";
+	
+	print "\ntrivolver was TERMINATED because of an error in the input. Specifically:\n";
+	print "\n$specific_warning\n";
+	
+	print "\n################################################################################\n";
+	
+	print "\nCALL trivolver.pl USING THE FOLLOWING OPTIONS:\n";
+	print "\n\t--tree (REQUIRED): file containing a bifurcating evolutionary tree in newick\n" . 
+			"\tformat with branch lengths. NO NODE NAMES OR SUPPORT VALUES AT THIS TIME.\n" .
+			"\tOnly the first encountered tree is used.\n";
+	print "\n\t--seed_sequence (REQUIRED): FASTA file containing starting (seed) sequence at\n" . 
+			"\ttree root, to be evolved. Only the first sequence encountered is used.\n";
+	print "\n\t--rate_matrix (REQUIRED): file containing 64 x 4 tab-delimited trinucleotide\n" . 
+			"\trate matrix in alphabetical order. First row values correspond to:\n" . 
+			"\tAAA>AAA   AAA>ACA   AAA>AGA   AAA>ATA\n";
+	print "\n\t--branch_unit (REQUIRED): branch lengths will be multiplied by this value and\n" . 
+			"\trounded up to the nearest integer to determine number of generations.\n";
+	print "\n\t--random_seed (OPTIONAL): integer with which to seed the random number\n" . 
+			"\tgenerator. If not supplied, one will be chosen and reported.\n";
+	print "\n\t--tracked_motif (OPTIONAL): a motif to track after each mutation. For example,\n" . 
+			"\tto report the number of CpG sites over the course of a run, specify CG.\n";
+	print "\n\t--track_rate (OPTIONAL): tell trivolver to report the mutation rate over time.\n";
+	print "\n\t--verbose (OPTIONAL): tell trivolver to tell you EVERYTHING that happens.\n";
+		
+	
+	print "\n################################################################################\n";
+	print "EXAMPLES:\n";
+	print "################################################################################\n";
+	
+	print "\n### FORMAT:\n";
+	
+	print "\ntrivolver.pl --tree=<newick>.txt --seed_sequence=<seed>.fa --rate_matrix=<64x4>.txt --branch_unit=<#> \\\n" . 
+			"\t--track_rate --tracked_motif=<ACGT> --verbose > output.txt\n";
+	
+	print "\n### EXAMPLE USING ALL OPTIONS:\n";
+	
+	print "\ntrivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt --branch_unit=144740 \\\n" . 
+			"\t--random_seed=123456789 --tracked_motif=CG --track_rate --verbose > my_output.txt\n";
+	
+	print "\n### EXAMPLE OF TYPICAL USAGE (program decides random seed; not verbose):\n";
+	
+	print "\ntrivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt --branch_unit=144740 \\\n" . 
+			"\t--tracked_motif=CG --track_rate > my_output.txt\n";
+	
+	print "\n### EXAMPLE WITH EVEN FEWER OPTIONS:\n";
+	
+	print "\ntrivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt --branch_unit=144740\n";
+	
+	print "\n################################################################################\n";
+	print "################################################################################\n\n";
+	
+	exit;
+	
+}
+
 
 exit;
 
