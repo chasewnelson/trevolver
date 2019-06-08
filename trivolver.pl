@@ -44,6 +44,8 @@ my $seed_sequence; # file containing starting (seed) sequence at tree root, to b
 my $rate_matrix; # file containing 64 x 4 tab-delimited rate matrix in alphabetical order. First row values for: AAA>AAA\tAAA>ACA\tAAA>AGA\tAAA>ATA\n
 my $branch_unit; # branch lengths will be multiplied by this value and rounded up to the nearest integer to determine number of generations
 my $random_seed; # integer with which to seed the random number generator
+my $tracked_motif;
+my $track_rate;
 my $verbose;
 
 # Get user input, if given. If a Boolean argument is passed, its value is 1; else undef
@@ -52,7 +54,10 @@ GetOptions( "tree=s" => \$tree,
 			"rate_matrix=s" => \$rate_matrix,
 			"branch_unit=f" => \$branch_unit,
 			"random_seed=i" => \$random_seed,
-			"verbose" => \$verbose)
+			"tracked_motif=s" => \$tracked_motif,
+			"track_rate" => \$track_rate,
+			"verbose" => \$verbose
+			)
 			
 			or die "\n### WARNING: Error in command line arguments. Script terminated.\n\n";
 
@@ -154,6 +159,13 @@ while(substr($tree, -1) =~ /[\s\;]/) {
 
 if($tree =~ /(\,[a-zA-Z0-9\.\-\|\:\']+\,)/) {
 	die "\n### WARNING: TREE MUST BE STRICTLY BIFURCATING BUT CONTAINS A POLYTOMY: \*\*\*$1\*\*\*\. SCRIPT TERMINATED.\n\n";
+}
+
+my $tree_opening_paren_count = ($tree =~ s/\(/\(/g);
+my $tree_closing_paren_count = ($tree =~ s/\)/\)/g);
+
+unless($tree_opening_paren_count > 0 && $tree_opening_paren_count == $tree_closing_paren_count) {
+	die "\n### WARNING: TREE MUST CONTAIN THE SAME NUMBER OF OPENING (currently $tree_opening_paren_count\) AND CLOSING (currently $tree_closing_paren_count\) PARENTHESES. SCRIPT TERMINATED.\n\n";
 }
 
 
@@ -314,11 +326,13 @@ my %tree;
 # t.test(x = c(150, 112, 112, 131, 132, 144, 138, 127, 133, 130, 126, 118, 125, 116, 139, 128, 133, 143, 133, 123, 142, 136, 144, 133, 144, 127, 149, 117, 140, 133), mu = 131.9674)
 
 my $num_mutations = 0;
-my $generations_elapsed = 0;
+#my $generations_elapsed = 0;
 my $total_branch_length = 0;
 my $branch_to_tip_length = 0;
-my %mutation_history; # mutations will be comma(',')-separated as <GEN><AA><SITE><DA>
+#my %mutation_history; # mutations will be comma(',')-separated as <GEN><AA><SITE><DA>
 my %taxa_histories;
+my %generational_histories;
+my $node_id = 1;
 
 print "\nANCESTRAL SEQUENCE: $seed_seq\n";
 
@@ -327,7 +341,7 @@ print "\nTREE: $tree\n";
 ##########################################################################################
 # THE SIMULATION: recursive evolution approach using the subroutine &evolve_two_subtrees()
 ##########################################################################################
-&evolve_two_subtrees($tree, $generations_elapsed, \%mutation_history);
+evolve_two_subtrees($tree, 0, 'n1=root,');
 
 
 ##########################################################################################
@@ -345,15 +359,51 @@ print "\ntotal number of mutations occurred: $num_mutations\n";
 print "\nlength of run in seconds: " . (time - $time1) . "\n\n";
 
 print "\n#########################################################################################\n";
-print "# MUTATION RESULTS:\n";
+print "# RESULTS:\n";
 print "#########################################################################################\n";
 
-print "\n//\n";
+print "\n//MUTATION\n";
 
 print "taxon\tsite\tmutations\n";
 foreach my $taxon (sort {$a <=> $b} keys %taxa_histories) {
 	foreach my $mutated_site (sort {$a <=> $b} keys %{$taxa_histories{$taxon}}) {
 		print "$taxon\t$mutated_site\t" . $taxa_histories{$taxon}->{$mutated_site} . "\n";
+	}
+}
+
+if($track_rate || $tracked_motif) {
+	print "\n//TRACKED\n";
+
+	my $out_line = "lineage\tgeneration\t";
+	
+	if ($track_rate) { $out_line .= "rate\t" }
+	if ($tracked_motif) { $out_line .= "motif\t" }
+	chop($out_line);
+	print "$out_line\n";
+	$out_line = '';
+	
+	
+	foreach my $these_nodes (sort keys %generational_histories) {
+		foreach my $generations_elapsed (sort {$a <=> $b} keys %{$generational_histories{$these_nodes}}) {
+			$out_line .= "$these_nodes";
+			chop($out_line);
+			$out_line .= "\t$generations_elapsed\t";
+			
+			if ($generational_histories{$these_nodes}->{$generations_elapsed}->{rate}) {
+				$out_line .= $generational_histories{$these_nodes}->{$generations_elapsed}->{rate} . "\t";
+			}
+			
+			foreach my $motif (sort keys %{$generational_histories{$these_nodes}->{$generations_elapsed}}) {
+				if ($motif ne 'rate' && $motif ne 'nodes' && $motif ne '') {
+					$out_line .= $generational_histories{$these_nodes}->{$generations_elapsed}->{$motif} . ",";
+				}
+			}
+			
+			chop($out_line);
+			print "$out_line\n";
+			$out_line = '';
+			
+		}
 	}
 }
 
@@ -367,25 +417,42 @@ exit;
 ##########################################################################################
 sub evolve_two_subtrees {
 	
-	my($tree, $generations_elapsed, $mutation_history_ref) = @_;
-	my %mutation_history = %$mutation_history_ref;
+	my($tree, $generations_elapsed, $nodes, $mutation_history_ref) = @_;
+	print "We got the arguments: @_\n";
+	
+	my %mutation_history;
+	
+	if($mutation_history_ref ne '') {
+		print "got here\n";
+		# It's SUPPOSEDLY possible to use map to do this, but not straightforward.
+		# The module::function Storable::dclone can do this, but I don't want dependencies.
+		# So we DO IT OURSELVES.
+		%mutation_history = %{$mutation_history_ref};
+#		my %mutation_history_linked = %{$mutation_history_ref};
+#		
+#		foreach my $mutated_site (sort {$a <=> $b} keys %mutation_history_linked) {
+#			my $this_mutation_history = $mutation_history_linked{$mutated_site};
+#			$mutation_history{$mutated_site} = $this_mutation_history;
+#		}
+	}
 	
 	if ($verbose) {
 		print "\n##########################################################################################\n";
-		print "Generations elapsed: " . sprintf("%.3f", $generations_elapsed) . "\n";
+		print "Analyzing node $node_id\nGenerations elapsed: " . sprintf("%.3f", $generations_elapsed) . "\n";
 		print "tree: $tree\n";
 	}
-	
-	# Construct the current state of the sequence given the evolutionary history
-	# Perhaps not quite as time-efficient, but MUCH MORE MEMORY EFFICIENT.
-	my $curr_sequence = $seed_seq;
-	foreach my $mutated_site (sort {$a <=> $b} keys %mutation_history) {
-		my $latest_nt = $mutation_history{$mutated_site};
-		chop($latest_nt); # remove ending comma (,)
-		$latest_nt = chop($latest_nt); # return new end, which is latest nucleotide
-		
-		substr($curr_sequence, $mutated_site - 1, 1, $latest_nt);
-	}
+
+# MOVED THIS TO A SMALLER SCOPE	
+#	# Construct the current state of the sequence given the evolutionary history
+#	# Perhaps not quite as time-efficient, but MUCH MORE MEMORY EFFICIENT.
+#	my $curr_sequence = $seed_seq;
+#	foreach my $mutated_site (sort {$a <=> $b} keys %mutation_history) {
+#		my $latest_nt = $mutation_history{$mutated_site};
+#		chop($latest_nt); # remove ending comma (,)
+#		$latest_nt = chop($latest_nt); # return new end, which is latest nucleotide
+#		
+#		substr($curr_sequence, $mutated_site - 1, 1, $latest_nt);
+#	}
 	
 #	print "\n";
 #	print "$mutation_history\n";
@@ -480,17 +547,19 @@ sub evolve_two_subtrees {
 					if ($verbose) { print "subtree1: $subtree1\nsubtree2: $subtree2\n" }
 					
 					# Recursively evolve subtrees
+					my %mutation_history_copy = %mutation_history;
+					
 					if ($verbose) { print "Analyzing subtree1...\n" }
-					&evolve_two_subtrees($subtree1, $generations_elapsed, \%mutation_history);
+					evolve_two_subtrees($subtree1, $generations_elapsed, $nodes, \%mutation_history);
 					
 					if ($verbose) { print "Analyzing subtree2...\n" }
-					&evolve_two_subtrees($subtree2, $generations_elapsed, \%mutation_history);
+					evolve_two_subtrees($subtree2, $generations_elapsed, $nodes, \%mutation_history_copy);
 					
 					return;
 				}
 				
 			} else {
-				die "\n### TERMINATED: Oonly one comma in tree but more than one opening parentheses. Format unexpected.\n";
+				die "\n### TERMINATED: Only one comma in tree but more than one opening parentheses. Format unexpected.\n";
 			}
 		
 		# MORE THAN ONE COMMA
@@ -594,7 +663,23 @@ sub evolve_two_subtrees {
 		### PATTERN (1) (-----):0.01. Ancestral branch underlying internal node. EVOLVE IT!
 		##################################################################################
 		if (length($subtree1) == 0 && length($subtree2) == 0 && length($internal_node) > 1 && length($branch_length) > 1) {
-
+			
+			$node_id++;
+			$nodes .= "n$node_id\,";
+			
+			# Construct the current state of the sequence given the evolutionary history
+			# Perhaps not quite as time-efficient, but MUCH MORE MEMORY EFFICIENT.
+			my $curr_sequence = $seed_seq;
+			print "seed=$seed_seq\n";
+			foreach my $mutated_site (sort {$a <=> $b} keys %mutation_history) {
+				my $latest_nt = $mutation_history{$mutated_site};
+				chop($latest_nt); # remove ending comma (,)
+				$latest_nt = chop($latest_nt); # return new end, which is latest nucleotide
+#				print "latest_nt=$latest_nt\n";
+				substr($curr_sequence, $mutated_site - 1, 1, $latest_nt);
+			}
+			print "curr=$curr_sequence\n";
+			
 			# Calculate number of generations on the branch
 			my $generations = $branch_length * $branch_unit;
 			$total_branch_length += $generations;
@@ -609,6 +694,11 @@ sub evolve_two_subtrees {
 				$trint_counts_sum++;
 			}
 			
+			print "trinucleotide counts, summing to $trint_counts_sum\:\n";
+			foreach (sort keys %trint_counts) {
+				print "$_\=" . $trint_counts{$_} . "\n";
+			}
+			
 			# Calculate weighted mean mutation rate per generation.
 			my $mut_rate_overall = 0;
 			foreach (keys %trint_counts) {
@@ -618,7 +708,19 @@ sub evolve_two_subtrees {
 				$mut_rate_overall += ($trint_counts{$_} * $rate_row_sum);
 			}
 			
-			if($verbose) { print "starting mutation rate: $mut_rate_overall\n" }
+			# Here's the issue: EACH "generations elapsed" is UNIQUE, so of course we'll only store one value per.
+			if ($verbose) { print "starting mutation rate: $mut_rate_overall\n" }
+#			if($generations_elapsed == 0 && ($track_rate || $tracked_motif)) {
+#				$generational_histories{$generations_elapsed}->{nodes} .= "$node_id\,";
+#			}
+			if ($generations_elapsed == 0 && $track_rate) {
+				$generational_histories{$nodes}->{$generations_elapsed}->{rate} = $mut_rate_overall;
+			}
+			if ($generations_elapsed == 0 && $tracked_motif) {
+				my @motifs_overlapping = ($curr_sequence =~ /(?=$tracked_motif)/g); # ?= means overlapping matches
+				$generational_histories{$nodes}->{$generations_elapsed}->{$tracked_motif} = scalar(@motifs_overlapping);
+			}
+			
 	#		print "mut_rate_mean=$mut_rate_mean\n";
 			# when all rates were 1e-7 (file SLiM_example_rate2.txt), this was 
 			#mut_rate_overall=0.0299994
@@ -661,37 +763,33 @@ sub evolve_two_subtrees {
 						$curr_rate_max += $this_rate;
 						
 						if ($rand_number2 < $curr_rate_max && $this_rate > 0) { # this one was it!
-	#						print "MUTATION! $trint" . ($seq_index + 1);
+							
 							$mutation_site_index = $seq_index + 1;
+							
+							print "MUTATION at generation " . ($generations_elapsed + $waiting_time) . "! $trint" . ($mutation_site_index + 1);
 							
 							# Prev and next overlapping trinucleotides
 							
 							# don't look at prev trint for FIRST trint
 							unless($seq_index == 0) {
 								$prev_trint_AA = substr($curr_sequence, $seq_index - 1, 3);
+								$prev_trint_DA = $prev_trint_AA;
+								substr($prev_trint_DA, 2, 1, $nt);
 							}
 							
 							# don't look at next trint for LAST trint
 							unless(($seq_index + 3) >= length($curr_sequence)) {
 								$next_trint_AA = substr($curr_sequence, $seq_index + 1, 3);
+								$next_trint_DA = $next_trint_AA;
+								substr($next_trint_DA, 0, 1, $nt);
 							}
 							
 							$trint_AA = $trint;
 							$nt_AA = substr($trint, 1, 1, $nt); # returns what was there before replacement
 							
-	#						print "$trint\n";
+							print "$trint";
 							$trint_DA = $trint;
 							$nt_DA = $nt;
-							
-							# don't look at prev trint for FIRST trint
-							unless($seq_index == 0) {
-								$prev_trint_DA = substr($prev_trint_AA, 2, 1, $nt);
-							}
-							
-							# don't look at next trint for LAST trint
-							unless(($seq_index + 3) >= length($curr_sequence)) {
-								$next_trint_DA = substr($next_trint_AA, 0, 1, $nt);
-							}
 							
 							# change state of actual sequence
 							substr($curr_sequence, $mutation_site_index, 1, $nt);
@@ -708,34 +806,31 @@ sub evolve_two_subtrees {
 				unless($mutation_complete == 1) { # very last site, nucleotide T
 					my $trint = substr($curr_sequence, length($curr_sequence) - 3, 3);
 					
-	#				print "MUTATION! $trint" . (length($curr_sequence) - 2);
-					
 					$mutation_site_index = (length($curr_sequence) - 2);
+					
+					print "MUTATION at generation " . ($generations_elapsed + $waiting_time) . "! $trint" . ($mutation_site_index + 1);
 					
 					# Prev and next overlapping trinucleotides
 					
 					# don't look at prev trint for FIRST trint
 					unless(length($curr_sequence) == 3) {
 						$prev_trint_AA = substr($curr_sequence, (length($curr_sequence) - 4), 3);
+						$prev_trint_DA = $prev_trint_AA;
+						substr($prev_trint_DA, 2, 1, 'T');
 					}
-					# NO NEXT TRINUCLEOTIDE!
 					
 					$trint_AA = $trint;
 					$nt_AA = substr($trint, 1, 1, 'T'); # returns what was there before replacement
 					
-					substr($trint, 1, 1, 'T');
-	#				print "$trint\n";
+					#substr($trint, 1, 1, 'T'); redundant
+					print "$trint";
 					$trint_DA = $trint;
 					$nt_DA = 'T';
 					
-					# don't look at prev trint for FIRST trint
-					unless(length($curr_sequence) == 3) {
-						$prev_trint_DA = substr($prev_trint_AA, 2, 1, 'T');
-					}
 					# NO NEXT TRINUCLEOTIDE!
 					
 					# change state of actual sequence
-					substr($curr_sequence, $mutation_site_index, 1, 'T'); # DOUBLE CHECK THAT
+					substr($curr_sequence, $mutation_site_index, 1, 'T'); # DOUBLE CHECK THAT COMEBACK
 					$mutation_complete = 1;
 				}
 				
@@ -745,7 +840,7 @@ sub evolve_two_subtrees {
 				
 				# UPDATE mutation history
 				#$mutation_history{$mutation_site_index + 1} .= int($generations_elapsed + 1) . "\-$trint_AA\-$trint_DA\,";
-				$mutation_history{$mutation_site_index + 1} .= int($generations_elapsed + 1) . "\-$nt_AA\>$nt_DA\,";
+				$mutation_history{($mutation_site_index + 1)} .= int($generations_elapsed + 1) . "\-$nt_AA\>$nt_DA\,";
 				
 				# UPDATE number of trinucleotides in sequence, taking advantage of 1 mutation 
 				# at a time. One nucleotide change will affect 3 overlapping trinucleotides.
@@ -753,17 +848,20 @@ sub evolve_two_subtrees {
 				# Also update the overall mutation rate.
 				
 				# SUBTRACT obliterated (ancestral) trinucleotide values
-				$trint_counts{$prev_trint_AA}--;
-				my $rate_row_sum_prev_trint_AA = $rate_matrix{$prev_trint_AA}->{'A'} + $rate_matrix{$prev_trint_AA}->{'C'} + 
-											$rate_matrix{$prev_trint_AA}->{'G'} + $rate_matrix{$prev_trint_AA}->{'T'};
-				$mut_rate_overall -= $rate_row_sum_prev_trint_AA;
+				if($prev_trint_AA ne '') {
+					$trint_counts{$prev_trint_AA}--;
+					my $rate_row_sum_prev_trint_AA = $rate_matrix{$prev_trint_AA}->{'A'} + $rate_matrix{$prev_trint_AA}->{'C'} + 
+												$rate_matrix{$prev_trint_AA}->{'G'} + $rate_matrix{$prev_trint_AA}->{'T'};
+					$mut_rate_overall -= $rate_row_sum_prev_trint_AA; # implicitly, * 1
+				}
 				
 				$trint_counts{$trint_AA}--;
 				my $rate_row_sum_AA = $rate_matrix{$trint_AA}->{'A'} + $rate_matrix{$trint_AA}->{'C'} + 
 											$rate_matrix{$trint_AA}->{'G'} + $rate_matrix{$trint_AA}->{'T'};
 				$mut_rate_overall -= $rate_row_sum_AA;
 				
-				if ($mutation_site_index < (length($curr_sequence) - 2)) { # if not LAST trinucleotide
+				if($next_trint_AA ne '') {
+				#if ($mutation_site_index < (length($curr_sequence) - 2)) { # if not LAST trinucleotide
 					$trint_counts{$next_trint_AA}--;
 					my $rate_row_sum_next_trint_AA = $rate_matrix{$next_trint_AA}->{'A'} + $rate_matrix{$next_trint_AA}->{'C'} + 
 												$rate_matrix{$next_trint_AA}->{'G'} + $rate_matrix{$next_trint_AA}->{'T'};
@@ -771,21 +869,37 @@ sub evolve_two_subtrees {
 				}
 				
 				# ADD spontaneously generated (derived) trinucleotide values
-				$trint_counts{$prev_trint_DA}++;
-				my $rate_row_sum_prev_trint_DA = $rate_matrix{$prev_trint_DA}->{'A'} + $rate_matrix{$prev_trint_DA}->{'C'} + 
-											$rate_matrix{$prev_trint_DA}->{'G'} + $rate_matrix{$prev_trint_DA}->{'T'};
-				$mut_rate_overall += $rate_row_sum_prev_trint_DA;
+				if($prev_trint_DA ne '') {
+					$trint_counts{$prev_trint_DA}++;
+					my $rate_row_sum_prev_trint_DA = $rate_matrix{$prev_trint_DA}->{'A'} + $rate_matrix{$prev_trint_DA}->{'C'} + 
+												$rate_matrix{$prev_trint_DA}->{'G'} + $rate_matrix{$prev_trint_DA}->{'T'};
+					$mut_rate_overall += $rate_row_sum_prev_trint_DA;
+				}
 				
 				$trint_counts{$trint_DA}++;
 				my $rate_row_sum_DA = $rate_matrix{$trint_DA}->{'A'} + $rate_matrix{$trint_DA}->{'C'} + 
 											$rate_matrix{$trint_DA}->{'G'} + $rate_matrix{$trint_DA}->{'T'};
 				$mut_rate_overall += $rate_row_sum_DA; # for example, if CpG created, may be higher
 				
-				if ($mutation_site_index < (length($curr_sequence) - 2)) { # if not LAST trinucleotide
+				if($next_trint_DA ne '') {
+				#if ($mutation_site_index < (length($curr_sequence) - 2)) { # if not LAST trinucleotide
 					$trint_counts{$next_trint_DA}++;
 					my $rate_row_sum_next_trint_DA = $rate_matrix{$next_trint_DA}->{'A'} + $rate_matrix{$next_trint_DA}->{'C'} + 
 												$rate_matrix{$next_trint_DA}->{'G'} + $rate_matrix{$next_trint_DA}->{'T'};
 					$mut_rate_overall += $rate_row_sum_next_trint_DA;
+				}
+				
+				print "; new mutation rate: $mut_rate_overall\n";
+				
+#				if ($track_rate || $tracked_motif) { 
+#					$generational_histories{$generations_elapsed}->{nodes} .= "$node_id\,";
+#				}
+				if ($track_rate) { 
+					$generational_histories{$nodes}->{$generations_elapsed}->{rate} = $mut_rate_overall;
+				}
+				if ($tracked_motif) { # COMEBACK that regex work?
+					my @motifs_overlapping = ($curr_sequence =~ /(?=$tracked_motif)/g); # ?= means overlapping matches
+					$generational_histories{$nodes}->{$generations_elapsed}->{$tracked_motif} = scalar(@motifs_overlapping);
 				}
 				
 	#			$final_mutation_rate = $mut_rate_overall;
@@ -832,8 +946,10 @@ sub evolve_two_subtrees {
 			if($verbose) { print "now submitting internal node for evolution:\ninternal_node: $internal_node\n" }
 			
 			# Recursively evolve subtrees
+			#my %mutation_history_copy = %mutation_history;
+			
 			if($verbose) { print "Analyzing internal_node...\n" }
-			&evolve_two_subtrees($internal_node, $generations_elapsed, \%mutation_history);
+			evolve_two_subtrees($internal_node, $generations_elapsed, $nodes, \%mutation_history);
 			
 		##################################################################################
 		### SUBTREE PATTERN
@@ -860,11 +976,13 @@ sub evolve_two_subtrees {
 			if($verbose) { print "subtree1: $subtree1\nsubtree2: $subtree2\n" }
 			
 			# Recursively evolve subtrees
+			my %mutation_history_copy = %mutation_history;
+			
 			if($verbose) { print "Analyzing subtree1...\n" }
-			&evolve_two_subtrees($subtree1, $generations_elapsed, \%mutation_history);
+			evolve_two_subtrees($subtree1, $generations_elapsed, $nodes, \%mutation_history);
 			
 			if($verbose) { print "Analyzing subtree2...\n" }
-			&evolve_two_subtrees($subtree2, $generations_elapsed, \%mutation_history);
+			evolve_two_subtrees($subtree2, $generations_elapsed, $nodes, \%mutation_history_copy);
 		
 		##################################################################################
 		## NO RECOGNIZABLE PATTERN: ABORT!
@@ -879,6 +997,22 @@ sub evolve_two_subtrees {
 		#return $mutation_history;
 		#%taxa_histories
 		
+		$node_id++;
+		$nodes .= "n$node_id\,";
+		
+		# Construct the current state of the sequence given the evolutionary history
+		# Perhaps not quite as time-efficient, but MUCH MORE MEMORY EFFICIENT.
+		my $curr_sequence = $seed_seq;
+		print "seed=$seed_seq\n";
+		foreach my $mutated_site (sort {$a <=> $b} keys %mutation_history) {
+			my $latest_nt = $mutation_history{$mutated_site};
+			chop($latest_nt); # remove ending comma (,)
+			$latest_nt = chop($latest_nt); # return new end, which is latest nucleotide
+#			print "latest_nt=$latest_nt\n";
+			substr($curr_sequence, $mutated_site - 1, 1, $latest_nt);
+		}
+		print "curr=$curr_sequence\n";
+		
 		my $taxon;
 		my $branch_length;
 		
@@ -888,6 +1022,9 @@ sub evolve_two_subtrees {
 		} else {
 			die "Might we have a wen ti? #3.\n";
 		}
+		
+		chop($nodes);
+		$nodes .= "=$taxon\,";
 		
 #		die "Might we have a wen ti? #4.\n";
 		
@@ -907,10 +1044,10 @@ sub evolve_two_subtrees {
 			$trint_counts_sum++;
 		}
 		
-	#		print "trinucleotide counts, summing to $trint_counts_sum\:\n";
-	#		foreach (sort keys %trint_counts) {
-	#			print "$_\=" . $trint_counts{$_} . "\n";
-	#		}
+		print "trinucleotide counts, summing to $trint_counts_sum\:\n";
+		foreach (sort keys %trint_counts) {
+			print "$_\=" . $trint_counts{$_} . "\n";
+		}
 		
 		# Calculate weighted mean mutation rate per generation.
 		my $mut_rate_overall = 0;
@@ -966,37 +1103,33 @@ sub evolve_two_subtrees {
 					$curr_rate_max += $rate_matrix{$trint}->{$nt};
 					
 					if ($rand_number2 < $curr_rate_max) { # this one was it!
-	#						print "MUTATION! $trint" . ($seq_index + 1);
+						
 						$mutation_site_index = $seq_index + 1;
+						
+						print "MUTATION at generation " . ($generations_elapsed + $waiting_time) . "! $trint" . ($mutation_site_index + 1);
 						
 						# Prev and next overlapping trinucleotides
 						
 						# don't look at prev trint for FIRST trint
 						unless($seq_index == 0) {
 							$prev_trint_AA = substr($curr_sequence, $seq_index - 1, 3);
+							$prev_trint_DA = $prev_trint_AA;
+							substr($prev_trint_DA, 2, 1, $nt);
 						}
 						
 						# don't look at next trint for LAST trint
 						unless(($seq_index + 3) >= length($curr_sequence)) {
 							$next_trint_AA = substr($curr_sequence, $seq_index + 1, 3);
+							$next_trint_DA = $next_trint_AA;
+							substr($next_trint_DA, 0, 1, $nt);
 						}
 						
 						$trint_AA = $trint;
 						$nt_AA = substr($trint, 1, 1, $nt); # returns what was there before replacement
 						
-	#						print "$trint\n";
+						print "$trint";
 						$trint_DA = $trint;
 						$nt_DA = $nt;
-						
-						# don't look at prev trint for FIRST trint
-						unless($seq_index == 0) {
-							$prev_trint_DA = substr($prev_trint_AA, 2, 1, $nt);
-						}
-						
-						# don't look at next trint for LAST trint
-						unless(($seq_index + 3) >= length($curr_sequence)) {
-							$next_trint_DA = substr($next_trint_AA, 0, 1, $nt);
-						}
 						
 						# change state of actual sequence
 						substr($curr_sequence, $mutation_site_index, 1, $nt);
@@ -1013,31 +1146,26 @@ sub evolve_two_subtrees {
 			unless($mutation_complete == 1) { # very last site, nucleotide T
 				my $trint = substr($curr_sequence, length($curr_sequence) - 3, 3);
 				
-#				print "MUTATION! $trint" . (length($curr_sequence) - 2);
-				
 				$mutation_site_index = (length($curr_sequence) - 2);
+				
+				print "MUTATION at generation " . ($generations_elapsed + $waiting_time) . "! $trint" . ($mutation_site_index + 1);
 				
 				# Prev and next overlapping trinucleotides
 				
 				# don't look at prev trint for FIRST trint
 				unless(length($curr_sequence) == 3) {
 					$prev_trint_AA = substr($curr_sequence, (length($curr_sequence) - 4), 3);
+					$prev_trint_DA = $prev_trint_AA;
+					substr($prev_trint_DA, 2, 1, 'T');
 				}
-				
-				# NO NEXT TRINUCLEOTIDE!
 				
 				$trint_AA = $trint;
 				$nt_AA = substr($trint, 1, 1, 'T'); # returns what was there before replacement
 				
-				substr($trint, 1, 1, 'T');
-#				print "$trint\n";
+				#substr($trint, 1, 1, 'T'); # redundant
+				print "$trint";
 				$trint_DA = $trint;
 				$nt_DA = 'T';
-				
-				# don't look at prev trint for FIRST trint
-				unless(length($curr_sequence) == 3) {
-					$prev_trint_DA = substr($prev_trint_AA, 2, 1, 'T');
-				}
 				
 				# NO NEXT TRINUCLEOTIDE!
 				
@@ -1052,7 +1180,7 @@ sub evolve_two_subtrees {
 			
 			# UPDATE mutation history
 			#$mutation_history{$mutation_site_index + 1} .= int($generations_elapsed + 1) . "\-$trint_AA\-$trint_DA\,";
-			$mutation_history{$mutation_site_index + 1} .= int($generations_elapsed + 1) . "\-$nt_AA\>$nt_DA\,";
+			$mutation_history{($mutation_site_index + 1)} .= int($generations_elapsed + 1) . "\-$nt_AA\>$nt_DA\,";
 			
 			# UPDATE number of trinucleotides in sequence, taking advantage of 1 mutation 
 			# at a time. One nucleotide change will affect 3 overlapping trinucleotides.
@@ -1060,17 +1188,20 @@ sub evolve_two_subtrees {
 			# Also update the overall mutation rate.
 			
 			# SUBTRACT obliterated (ancestral) trinucleotide values
-			$trint_counts{$prev_trint_AA}--;
-			my $rate_row_sum_prev_trint_AA = $rate_matrix{$prev_trint_AA}->{'A'} + $rate_matrix{$prev_trint_AA}->{'C'} + 
-										$rate_matrix{$prev_trint_AA}->{'G'} + $rate_matrix{$prev_trint_AA}->{'T'};
-			$mut_rate_overall -= $rate_row_sum_prev_trint_AA;
+			if($prev_trint_AA ne '') {
+				$trint_counts{$prev_trint_AA}--;
+				my $rate_row_sum_prev_trint_AA = $rate_matrix{$prev_trint_AA}->{'A'} + $rate_matrix{$prev_trint_AA}->{'C'} + 
+											$rate_matrix{$prev_trint_AA}->{'G'} + $rate_matrix{$prev_trint_AA}->{'T'};
+				$mut_rate_overall -= $rate_row_sum_prev_trint_AA;
+			}
 			
 			$trint_counts{$trint_AA}--;
 			my $rate_row_sum_AA = $rate_matrix{$trint_AA}->{'A'} + $rate_matrix{$trint_AA}->{'C'} + 
 										$rate_matrix{$trint_AA}->{'G'} + $rate_matrix{$trint_AA}->{'T'};
 			$mut_rate_overall -= $rate_row_sum_AA;
 			
-			if ($mutation_site_index < (length($curr_sequence) - 2)) { # if not LAST trinucleotide
+			if($next_trint_AA ne '') {
+			#if ($mutation_site_index < (length($curr_sequence) - 2)) { # if not LAST trinucleotide
 				$trint_counts{$next_trint_AA}--;
 				my $rate_row_sum_next_trint_AA = $rate_matrix{$next_trint_AA}->{'A'} + $rate_matrix{$next_trint_AA}->{'C'} + 
 											$rate_matrix{$next_trint_AA}->{'G'} + $rate_matrix{$next_trint_AA}->{'T'};
@@ -1078,21 +1209,37 @@ sub evolve_two_subtrees {
 			}
 			
 			# ADD spontaneously generated (derived) trinucleotide values
-			$trint_counts{$prev_trint_DA}++;
-			my $rate_row_sum_prev_trint_DA = $rate_matrix{$prev_trint_DA}->{'A'} + $rate_matrix{$prev_trint_DA}->{'C'} + 
-										$rate_matrix{$prev_trint_DA}->{'G'} + $rate_matrix{$prev_trint_DA}->{'T'};
-			$mut_rate_overall += $rate_row_sum_prev_trint_DA;
+			if($prev_trint_DA ne '') {
+				$trint_counts{$prev_trint_DA}++;
+				my $rate_row_sum_prev_trint_DA = $rate_matrix{$prev_trint_DA}->{'A'} + $rate_matrix{$prev_trint_DA}->{'C'} + 
+											$rate_matrix{$prev_trint_DA}->{'G'} + $rate_matrix{$prev_trint_DA}->{'T'};
+				$mut_rate_overall += $rate_row_sum_prev_trint_DA;
+			}
 			
 			$trint_counts{$trint_DA}++;
 			my $rate_row_sum_DA = $rate_matrix{$trint_DA}->{'A'} + $rate_matrix{$trint_DA}->{'C'} + 
 										$rate_matrix{$trint_DA}->{'G'} + $rate_matrix{$trint_DA}->{'T'};
 			$mut_rate_overall += $rate_row_sum_DA; # for example, if CpG created, may be higher
 			
-			if ($mutation_site_index < (length($curr_sequence) - 2)) { # if not LAST trinucleotide
+			if($next_trint_DA ne '') {
+			#if ($mutation_site_index < (length($curr_sequence) - 2)) { # if not LAST trinucleotide
 				$trint_counts{$next_trint_DA}++;
 				my $rate_row_sum_next_trint_DA = $rate_matrix{$next_trint_DA}->{'A'} + $rate_matrix{$next_trint_DA}->{'C'} + 
 											$rate_matrix{$next_trint_DA}->{'G'} + $rate_matrix{$next_trint_DA}->{'T'};
 				$mut_rate_overall += $rate_row_sum_next_trint_DA;
+			}
+			
+			print "; new mutation rate: $mut_rate_overall\n";
+			
+#			if ($track_rate || $tracked_motif) { 
+#				$generational_histories{$generations_elapsed}->{nodes} .= "$node_id\,";
+#			}
+			if ($track_rate) { 
+				$generational_histories{$nodes}->{$generations_elapsed}->{rate} = $mut_rate_overall;
+			}
+			if ($tracked_motif) { # COMEBACK that regex work?
+				my @motifs_overlapping = ($curr_sequence =~ /(?=$tracked_motif)/g); # ?= means overlapping matches
+				$generational_histories{$nodes}->{$generations_elapsed}->{$tracked_motif} = scalar(@motifs_overlapping);
 			}
 			
 			# New waiting time
@@ -1121,7 +1268,6 @@ sub evolve_two_subtrees {
 			$taxa_histories{$taxon}->{$mutated_site} = $this_mutation_history;
 #			print "$mutated_site: $this_mutation_history\n";
 		}
-		
 	} # END BASE CASE: a terminal taxon
 	
 } # END SUBROUTINE
