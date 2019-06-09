@@ -48,7 +48,7 @@ Call trivolver using the following options:
 ### FORMAT:
 
 	trivolver.pl --tree=<newick>.txt --seed_sequence=<seed>.fa --rate_matrix=<64x4>.txt \\ 
-	--branch_unit=<#> --track_mutations --tracked_motif=<ACGT> --verbose > output.txt;
+	--branch_unit=<#> --track_mutations --tracked_motif=<ACGT> --verbose > output.txt
 	
 ### ALL OPTIONS USED:
 
@@ -63,7 +63,7 @@ Call trivolver using the following options:
 ### EVEN FEWER OPTIONS AND OUTPUT TO SCREEN:
 
 	trivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\
-	--branch_unit=144740;
+	--branch_unit=144740
 
 ## <a name="output"></a>Output
 
