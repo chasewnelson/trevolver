@@ -4,7 +4,7 @@
 
 To test the simulation with the example data, run the following at the Unix command line or Mac Terminal:
 
-`trivolver.pl --tree=test_6taxa.txt --seed_sequence=seed_sequence.fa --rate_matrix=mutation_CpGx20.txt --branch_unit=144740 > output.txt`
+`trivolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa --rate_matrix=mutation_CpGx20.txt --branch_unit=144740 > output.txt`
 
 Find more [examples](#examples) below.
 
