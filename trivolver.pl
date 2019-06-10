@@ -836,6 +836,9 @@ sub evolve_two_subtrees {
 				#print "waiting_time=$waiting_time\n";
 			} # finish a new mutation
 			
+			# REMOVE $curr_sequence because it is no longer needed!
+			undef($curr_sequence);
+			
 			# Add the remaining time in which mutation DIDN'T occur.
 			$generations_elapsed += $generations;
 			
@@ -1137,6 +1140,9 @@ sub evolve_two_subtrees {
 			$waiting_time = -(1 / $mut_rate_overall) * log($rand_number);
 			#print "waiting_time=$waiting_time\n";
 		} # finish a new mutation
+		
+		# REMOVE $curr_sequence because it is no longer needed!
+		#undef($curr_sequence); # will evaporate in a second anyway
 		
 		# Add the remaining time in which mutation DIDN'T occur.
 		$generations_elapsed += $generations;
