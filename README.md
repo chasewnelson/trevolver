@@ -8,6 +8,18 @@ To test the simulation with the example data, run the following at the Unix comm
 
 Find more [examples](#examples) below.
 
+## <a name="contents"></a>Contents
+
+* [Description](#description)
+* [How it Works](#how-it-works)
+* [Options](#options)
+* [Examples](#examples)
+* [Output](#output)
+* [Troubleshooting](#troubleshooting)
+* [Acknowledgments](#acknowledgments)
+* [Contact](#contact)
+* [References](#references)
+
 ## <a name="description"></a>Description
 
 New mutation data, including *de novo* mutations detected in whole genome sequencing of father/mother-child 'trios', can be used to empirically estimate context-dependent mutation rates. The most commonly used context is the trinucleotide, where the flanking nucleotide on either side of a position are considered (one 5', one 3'). Unfortunately, a tool is lacking for simulation of non-reversible (*i.e.*, asymmetric rates) DNA evolution on a fixed bifurcating (binary; fully resolved) gene tree, such as that produced by coalescence simulations. **trivolver** was made to fill this gap. The user must provide a bifurcating tree, a seed sequence, a 64 × 4 (trinucleotide × nucleotide) rate matrix, and a branch unit (see [options](#options)). **trivolver** outputs a <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) SNP report for all tree tips (leaves; taxa), as well as the history of mutations and motifs for each lineage (see [output](#output)).
