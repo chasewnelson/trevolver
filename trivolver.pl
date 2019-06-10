@@ -371,7 +371,7 @@ exit;
 sub evolve_two_subtrees {
 	
 	my($tree, $generations_elapsed, $mutation_count, $nodes, $mutation_history_ref) = @_;
-	print "We got the arguments: @_\n";
+#	if($verbose) { print "We got the arguments: @_\n" }
 	
 	my %mutation_history;
 	
@@ -673,7 +673,7 @@ sub evolve_two_subtrees {
 							
 							$mutation_site_index = $seq_index + 1;
 							
-							print "MUTATION at generation " . ($generations_elapsed + $waiting_time) . "! $trint" . ($mutation_site_index + 1);
+							if($verbose) { print "MUTATION at generation " . ($generations_elapsed + $waiting_time) . "! $trint" . ($mutation_site_index + 1) }
 							
 							# Prev and next overlapping trinucleotides
 							
@@ -694,7 +694,7 @@ sub evolve_two_subtrees {
 							$trint_AA = $trint;
 							$nt_AA = substr($trint, 1, 1, $nt); # returns what was there before replacement
 							
-							print "$trint";
+							if($verbose) { print "$trint" }
 							$trint_DA = $trint;
 							$nt_DA = $nt;
 							
@@ -715,7 +715,7 @@ sub evolve_two_subtrees {
 					
 					$mutation_site_index = (length($curr_sequence) - 2);
 					
-					print "MUTATION at generation " . ($generations_elapsed + $waiting_time) . "! $trint" . ($mutation_site_index + 1);
+					if($verbose) { print "MUTATION at generation " . ($generations_elapsed + $waiting_time) . "! $trint" . ($mutation_site_index + 1) }
 					
 					# Prev and next overlapping trinucleotides
 					
@@ -730,7 +730,7 @@ sub evolve_two_subtrees {
 					$nt_AA = substr($trint, 1, 1, 'T'); # returns what was there before replacement
 					
 					#substr($trint, 1, 1, 'T'); redundant
-					print "$trint";
+					if($verbose) { print "$trint" }
 					$trint_DA = $trint;
 					$nt_DA = 'T';
 					
@@ -796,7 +796,7 @@ sub evolve_two_subtrees {
 					$mut_rate_overall += $rate_row_sum_next_trint_DA;
 				}
 				
-				print "; new mutation rate: $mut_rate_overall\n";
+				if($verbose) { print "; new mutation rate: $mut_rate_overall\n" }
 				
 #				if ($track_mutations || $tracked_motif) { 
 #					$generational_histories{$generations_elapsed}->{nodes} .= "$node_id\,";
@@ -883,7 +883,8 @@ sub evolve_two_subtrees {
 		##################################################################################
 		} else {
 			print "$tree_stripped\n";
-			die "### TERMINATED: TREE ABOVE DIDN'T MATCH ANY EXPECTED TREEE FORMAT.\n\n";
+			my $specific_warning = "### TERMINATED: TREE ABOVE DIDN'T MATCH ANY EXPECTED TREE FORMAT.";
+			print_usage_message($specific_warning);
 		}
 		
 	} else { # BASE CASE: A SINGLE TAXON (NO COMMA). EVOLVE IT AND STORE ITS MUTATION HISTORY.
@@ -913,6 +914,7 @@ sub evolve_two_subtrees {
 		if ($tree =~ /^(.+)\:(.+)$/) {
 			$taxon = $1;
 			$branch_length = $2;
+			$taxon =~ s/^\(//; # in case it's a 1-taxon tree, i.e., a single sequence
 		} else {
 			die "Might we have a wen ti? #3.\n";
 		}
@@ -993,7 +995,7 @@ sub evolve_two_subtrees {
 						
 						$mutation_site_index = $seq_index + 1;
 						
-						print "MUTATION at generation " . ($generations_elapsed + $waiting_time) . "! $trint" . ($mutation_site_index + 1);
+						if($verbose) { print "MUTATION at generation " . ($generations_elapsed + $waiting_time) . "! $trint" . ($mutation_site_index + 1) }
 						
 						# Prev and next overlapping trinucleotides
 						
@@ -1014,7 +1016,7 @@ sub evolve_two_subtrees {
 						$trint_AA = $trint;
 						$nt_AA = substr($trint, 1, 1, $nt); # returns what was there before replacement
 						
-						print "$trint";
+						if($verbose) { print "$trint" }
 						$trint_DA = $trint;
 						$nt_DA = $nt;
 						
@@ -1035,7 +1037,7 @@ sub evolve_two_subtrees {
 				
 				$mutation_site_index = (length($curr_sequence) - 2);
 				
-				print "MUTATION at generation " . ($generations_elapsed + $waiting_time) . "! $trint" . ($mutation_site_index + 1);
+				if($verbose) { print "MUTATION at generation " . ($generations_elapsed + $waiting_time) . "! $trint" . ($mutation_site_index + 1) }
 				
 				# Prev and next overlapping trinucleotides
 				
@@ -1050,7 +1052,7 @@ sub evolve_two_subtrees {
 				$nt_AA = substr($trint, 1, 1, 'T'); # returns what was there before replacement
 				
 				#substr($trint, 1, 1, 'T'); # redundant
-				print "$trint";
+				if($verbose) { print "$trint" }
 				$trint_DA = $trint;
 				$nt_DA = 'T';
 				
@@ -1116,7 +1118,7 @@ sub evolve_two_subtrees {
 				$mut_rate_overall += $rate_row_sum_next_trint_DA;
 			}
 			
-			print "; new mutation rate: $mut_rate_overall\n";
+			if($verbose) { print "; new mutation rate: $mut_rate_overall\n" }
 			
 #			if ($track_mutations || $tracked_motif) { 
 #				$generational_histories{$generations_elapsed}->{nodes} .= "$node_id\,";
