@@ -47,27 +47,38 @@ Call trivolver using the following options:
 
 ### FORMAT:
 
-	trivolver.pl --tree=<newick>.txt --seed_sequence=<seed>.fa --rate_matrix=<64x4>.txt \\ 
-	--branch_unit=<#> --track_mutations --tracked_motif=<ACGT> --verbose > output.txt
+	trivolver.pl --tree=<newick>.txt --seed_sequence=<seed>.fa \
+	--rate_matrix=<64x4>.txt  --branch_unit=<#> --track_mutations \
+	--tracked_motif=<ACGT> --verbose > output.txt
 	
 ### ALL OPTIONS USED:
 
-	trivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\
-	--branch_unit=144740 --random_seed=123456789 --tracked_motif=CG --track_mutations --verbose > my_output.txt
+	trivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa \
+	--rate_matrix=my_mutations.txt  --branch_unit=144740 \
+	--random_seed=123456789 --tracked_motif=CG --track_mutations \
+	--verbose > my_output.txt
 	
 ### TYPICAL USAGE (program decides random seed; not verbose):
 
-	trivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\
-	--branch_unit=144740 --tracked_motif=CG --track_mutations > my_output.txt
+	trivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa \
+	--rate_matrix=my_mutations.txt --branch_unit=144740 \
+	--tracked_motif=CG --track_mutations > my_output.txt
 
 ### EVEN FEWER OPTIONS AND OUTPUT TO SCREEN:
 
-	trivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\
-	--branch_unit=144740
+	trivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa \
+	--rate_matrix=my_mutations.txt --branch_unit=144740
 
 ## <a name="output"></a>Output
 
-Depending on the options specified, **trivolver** will output a mutation history file, a <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) SNP report for leaf (terminal) nodes, and/or full sequences for some or all leaf nodes.
+Depending on the options specified, **trivolver** will output a full mutation history and tracked information (mutation rates and motifs), immediately following single lines containing `//`. Soon, convenience functions will be available to output a <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) SNP report for leaf (terminal) nodes, and/or full sequences for some/all nodes.
+
+## <a name="troubleshooting"></a>Troubleshooting
+
+* **Simulating a single sequence.** It is entirely possible to simulate the evolution of a single sequence. Simply provide a tree with only one taxon and branch length. For example, to simulate the evolution of a single sequence named "my_creature" for 1 million generations, the tree file would contain, simply, `(my_creature:1000000);`. Provide a scaling factor (`--branch_unit`) of 1, and you're good to go:
+
+		trivolver.pl --tree=my_branch.txt --seed_sequence=my_ancestor.fa \
+		--rate_matrix=my_mutations.txt --branch_unit=1
 
 ## <a name="acknowledgments"></a>Acknowledgments
 **trivolver** was written by with support from a Gerstner Scholars Fellowship from the Gerstner Family Foundation at the American Museum of Natural History to C.W.N. (2016-2019), and is maintained with support from the same. The logo image was designed by Mitch Lin (2019); copyright-free DNA helix obtained from Pixabay.
