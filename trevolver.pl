@@ -8,7 +8,7 @@
 #########################################################################################
 # EXAMPLE CALL:
 #########################################################################################
-# trivolver.pl --tree=<treefile>.newick --seed_sequence=<sequence>.fasta --rate_matrix=<k x 4 table>.txt --branch_unit=<4N0 integer> --random_seed=<optional integer>
+# trevolver.pl --tree=<treefile>.newick --seed_sequence=<sequence>.fasta --rate_matrix=<k x 4 table>.txt --branch_unit=<4N0 integer> --random_seed=<optional integer>
 #########################################################################################
 
 # Copyright (C) 2019 Chase W. Nelson
@@ -55,7 +55,7 @@ GetOptions( "tree=s" => \$tree,
 			"verbose" => \$verbose
 			)
 			
-			or print_usage_message("### WARNING: Error in command line arguments (option misspelled?). trivolver terminated.");
+			or print_usage_message("### WARNING: Error in command line arguments (option misspelled?). trevolver terminated.");
 
 
 unless(-f "$tree") {
@@ -82,9 +82,9 @@ unless($branch_unit =~ /\d/) {
 # Extract tree file prefix
 my $file_prefix;
 if($tree =~/(.+)\..+/) { 
-	$file_prefix = $1 . '_trivolver_results.tsv';
+	$file_prefix = $1 . '_trevolver_results.tsv';
 } else {
-	$file_prefix = 'trivolver_results.tsv';
+	$file_prefix = 'trevolver_results.tsv';
 }
 
 
@@ -256,7 +256,7 @@ print "#########################################################################
 
 print "\nAnalysis initiated at local time $local_time1\n";
 
-print "\nCOMMAND: trivolver.pl @commands\n";
+print "\nCOMMAND: trevolver.pl @commands\n";
 
 ##########################################################################################
 # Generate or assign random seed value
@@ -1179,16 +1179,16 @@ sub print_usage_message {
 	
 	print "\n################################################################################".
 		"\n##                                                                            ##".
-		"\n##              trivolver: Evolution On Tree Using Custom Rates!              ##".
+		"\n##              trevolver: Evolution On Tree Using Custom Rates!              ##".
 		"\n##                                                                            ##".
 		"\n################################################################################\n";
 	
-	print "\ntrivolver was TERMINATED because of an error in the input. Specifically:\n";
+	print "\ntrevolver was TERMINATED because of an error in the input. Specifically:\n";
 	print "\n$specific_warning\n";
 	
 	print "\n################################################################################\n";
 	
-	print "\nCALL trivolver.pl USING THE FOLLOWING OPTIONS:\n";
+	print "\nCALL trevolver.pl USING THE FOLLOWING OPTIONS:\n";
 	print "\t--tree (REQUIRED): file containing a bifurcating evolutionary tree in newick\n" . 
 			"\t\tformat with branch lengths. NO NODE NAMES OR SUPPORT VALUES AT THIS TIME.\n" .
 			"\t\tOnly the first encountered tree is used.\n";
@@ -1204,7 +1204,7 @@ sub print_usage_message {
 	print "\t--tracked_motif (OPTIONAL): a motif to track after each mutation. For example,\n" . 
 			"\t\tto report the number of CpG sites over the course of a run, specify CG.\n";
 	print "\t--track_mutations (OPTIONAL): reports the mutation rate and count over time.\n";
-	print "\t--verbose (OPTIONAL): tell trivolver to tell you EVERYTHING that happens.\n";
+	print "\t--verbose (OPTIONAL): tell trevolver to tell you EVERYTHING that happens.\n";
 		
 	
 	print "\n################################################################################\n";
@@ -1213,22 +1213,22 @@ sub print_usage_message {
 	
 	print "\n### FORMAT:\n";
 	
-	print "\n\ttrivolver.pl --tree=<newick>.txt --seed_sequence=<seed>.fa --rate_matrix=<64x4>.txt \\\n" . 
+	print "\n\ttrevolver.pl --tree=<newick>.txt --seed_sequence=<seed>.fa --rate_matrix=<64x4>.txt \\\n" . 
 			"\t--branch_unit=<#> --track_mutations --tracked_motif=<ACGT> --verbose > output.txt\n";
 	
 	print "\n### EXAMPLE USING ALL OPTIONS:\n";
 	
-	print "\n\ttrivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\\n" . 
+	print "\n\ttrevolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\\n" . 
 			"\t--branch_unit=144740 --random_seed=123456789 --tracked_motif=CG --track_mutations --verbose > my_output.txt\n";
 	
 	print "\n### EXAMPLE OF TYPICAL USAGE (program decides random seed; not verbose):\n";
 	
-	print "\n\ttrivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\\n" . 
+	print "\n\ttrevolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\\n" . 
 			"\t--branch_unit=144740 --tracked_motif=CG --track_mutations > my_output.txt\n";
 	
 	print "\n### EXAMPLE WITH EVEN FEWER OPTIONS AND OUTPUT TO SCREEN:\n";
 	
-	print "\n\ttrivolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\\n" .
+	print "\n\ttrevolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\\n" .
 			"\t--branch_unit=144740\n";
 	
 	print "\n################################################################################\n";
