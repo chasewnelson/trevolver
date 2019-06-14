@@ -42,6 +42,8 @@ my $branch_unit; # branch lengths will be multiplied by this value and rounded u
 my $random_seed; # integer with which to seed the random number generator
 my $tracked_motif;
 my $track_mutations;
+my $vcf_output;
+my $suppress_ancestral_seq;
 my $verbose;
 
 # Get user input, if given. If a Boolean argument is passed, its value is 1; else undef
@@ -52,11 +54,14 @@ GetOptions( "tree=s" => \$tree,
 			"random_seed=i" => \$random_seed,
 			"tracked_motif=s" => \$tracked_motif,
 			"track_mutations" => \$track_mutations,
+			"vcf_output=s" => \$vcf_output,
+			"suppress_ancestral_seq" => \$suppress_ancestral_seq,
 			"verbose" => \$verbose
 			)
 			
 			or print_usage_message("### WARNING: Error in command line arguments (option misspelled?). trevolver terminated.");
 
+#print "\nvcf_output=$vcf_output\n"; # the value of a called flag is 1
 
 unless(-f "$tree") {
 	my $specific_warning = "### WARNING: A valid --tree option must be provided.";
@@ -78,13 +83,23 @@ unless($branch_unit =~ /\d/) {
 	print_usage_message($specific_warning);
 }
 
+if (-f "$vcf_output" || $vcf_output =~ /^\-/) {
+	my $specific_warning = "### WARNING: A valid --vcf_output file name must be provided (or already exists).";
+	print_usage_message($specific_warning);
+}
+
+my $working_directory = `pwd`;
+chomp($working_directory);
+#print "\nworking_directory=$working_directory\n"; # does NOT include a trailing forward slash, but does end in a newline
+
+
 ##########################################################################################
 # Extract tree file prefix
 my $file_prefix;
-if($tree =~/(.+)\..+/) { 
-	$file_prefix = $1 . '_trevolver_results.tsv';
+if($tree =~/\/([^\/]+)\..+/) { 
+	$file_prefix = $1;
 } else {
-	$file_prefix = 'trevolver_results.tsv';
+	$file_prefix = 'trevolver_input';
 }
 
 
@@ -168,9 +183,12 @@ if($verbose) {
 	print "\nRecording seed sequence data from $seed_sequence...\n";
 }
 
+my $fasta_header = '';
+
 while(<IN_FASTA>) {
 	chomp;
-	if(/>/) {
+	if(/>([\S]+)\s*/) {
+		$fasta_header = $1;
 		if($seq_num == 0) {
 			$seq_num ++;
 		} else {
@@ -190,6 +208,8 @@ unless($seed_seq =~ /[ACGT]/ && length($seed_seq) >= 3) {
 	my $specific_warning = "### WARNING: Sequence does not contain more than two nucleotides (A, C, G, T).";
 	print_usage_message($specific_warning);
 }
+
+my $seed_seq_length = length($seed_seq);
 
 
 ##########################################################################################
@@ -246,7 +266,7 @@ unless($row_index == 64 || $max_whitespaces <= 5) { # i.e., one more than the la
 	print_usage_message($specific_warning);
 }
 
-
+if ($verbose) { print "\n" }
 
 print "################################################################################".
 	"\n##                                                                            ##".
@@ -285,8 +305,11 @@ my $branch_to_tip_length = 0;
 my %taxa_histories;
 my %generational_histories;
 my $node_id = 1;
+my %mutated_sites;
 
-print "\nANCESTRAL SEQUENCE: $seed_seq\n";
+unless($suppress_ancestral_seq) {
+	print "\nANCESTRAL SEQUENCE: $seed_seq\n";
+}
 
 print "\nTREE: $tree\n";
 
@@ -359,6 +382,383 @@ if($track_mutations || $tracked_motif) {
 		}
 	}
 }
+
+
+##########################################################################################
+### PRINT VCF FILE
+if ($vcf_output =~ /\w+/) {
+	chomp($vcf_output);
+#	my @local_time = localtime;
+#	my $year = $local_time[5];
+#	my $month = $local_time[4];
+#	my $day = $local_time[3];
+	my (undef, undef, undef, $day, $month, $year) = localtime;
+	$year = $year + 1900;
+	$month += 1;
+	if (length($month)  == 1) { $month = "0$month" }
+	if (length($day) == 1) { $day = "0$day" }
+	my $today = "$year$month$day";
+	
+#	print "\nworking_directory=$working_directory\n";
+	
+	if ($vcf_output =~ /\//) { # a path was provided
+		my $vcf_output_dir = $vcf_output;
+		$vcf_output_dir =~ s/\/[^\/]+$//;
+		#print "\nvcf_output_dir=$vcf_output_dir\n";
+		
+		if (-d "$vcf_output_dir") {
+			if (-f "$vcf_output") { # file already exist?
+				my $new_vcf_output = "$working_directory\/$file_prefix\_$random_seed\.vcf";
+				print "\n\/\/VCF\n$vcf_output already exists. VCF output being placed in $new_vcf_output.\n";
+				$vcf_output = $new_vcf_output;
+			} else { # else we're good to go
+				print "\n\/\/VCF\nVCF output being placed in $vcf_output.\n";
+			}
+		} else {
+			my $new_vcf_output = "$working_directory\/$file_prefix\_$random_seed\.vcf";
+			print "\n\/\/VCF\n$vcf_output_dir does not exist. VCF output being placed in $new_vcf_output.\n";
+			$vcf_output = $new_vcf_output;
+		}
+		
+	} else {
+		print "\n\/\/VCF\nVCF output being placed in $working_directory\/$vcf_output.\n";
+		$vcf_output = "$working_directory\/$vcf_output";
+	}
+	
+	open(OUT_TREVOLVER_VCF, ">>$vcf_output");
+	print OUT_TREVOLVER_VCF "##fileformat=VCFv4.1\n" . 
+		"##FILTER=<ID=PASS,Description=\"All filters passed\">\n" . 
+#		"##fileDate=$year$month$day\n" .
+#		"##fileDate=<Description=\"" . localtime . "\">\n" . 
+		"##fileDate=$today\n" . 
+		"##reference=https://github.com/chasewnelson/trevolver\n" . 
+		"##source=<TREVOLVER,Description=\"trevolver.pl @commands\">\n" . 
+		"##tree=$tree\n" . 
+		"##seed_sequence=$seed_sequence\n" . 
+		"##rate_matrix=$rate_matrix\n" . 
+		"##branch_unit=$branch_unit\n" . 
+		"##random_seed=$random_seed\n" . 
+		"##tracked_motif=$tracked_motif\n" . 
+		"##contig=<ID=$file_prefix,assembly=1,length=$seed_seq_length>\n" . 
+		"##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n" . 
+		"##INFO=<ID=AC,Number=A,Type=Integer,Description=\"Total number of alternate alleles in called genotypes\">\n" . 
+		"##INFO=<ID=AF,Number=A,Type=Float,Description=\"Estimated allele frequency in the range (0,1)\">\n" . 
+		"##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of samples with data, equivalent to number of extant sequences\">\n" . 
+		"##INFO=<ID=AN,Number=1,Type=Integer,Description=\"Total number of alleles in called genotypes, equivalent to number of extant sequences\">\n" . 
+		"##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total read depth; here, equivalent to number of extant sequences\">\n" . 
+		"##INFO=<ID=AA,Number=1,Type=String,Description=\"Ancestral Allele. AA: Ancestral allele, REF:Reference Allele, ALT:Alternate Allele\">\n" . 
+		"##INFO=<ID=VT,Number=.,Type=String,Description=\"indicates what type of variant the line represents\">\n" . 
+		"##INFO=<ID=MUTATIONS,Number=.,Type=String,Description=\"unique mutations that occurred at this site\">\n" . 
+		"##INFO=<ID=GENERATIONS,Number=.,Type=String,Description=\"the generations at which unique mutations occurred at this site\">\n" . 
+		"##INFO=<ID=TAXA,Number=.,Type=String,Description=\"the number of extant taxa (leaves) sharing the unique mutations that occurred at this site\">\n" . 
+		"##INFO=<ID=MULTIHIT,Number=0,Type=Flag,Description=\"indicates whether a site has experienced multiple hits, i.e., more than one mutation\">\n" . 
+		"##INFO=<ID=MULTIALLELIC,Number=0,Type=Flag,Description=\"indicates whether a site is multi-allelic\">\n" . 
+		"##INFO=<ID=BACK_MUTATION,Number=0,Type=Flag,Description=\"indicates whether a site has experienced back mutation, i.e., return to a previous state via MULTIHIT\">\n" .
+		"##INFO=<ID=RECURRENT_MUTATION,Number=0,Type=Flag,Description=\"indicates whether a site has experienced recurrent mutation, i.e., the same change occurring multiple times independently\">\n" . 
+		"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
+	
+	my %site_to_alleles;
+	
+#	my %multi_hit;
+#	my %back_mutation;
+#	my %recurrent_mutation;
+	my $num_taxa = 0;
+						
+	### BETTER WAY TO DO IT: first store ALL mutated sites somewhere. Loop through THOSE here below.
+	### If the current taxon HAS it, do what you do here. If NOT, then simply add the AA state. Takes care of everything later.
+	
+	# KEYS of %mutated_sites
+	foreach my $mutated_site (sort {$a <=> $b} keys %mutated_sites) {
+		
+		my $AA = substr($seed_seq, $mutated_site - 1, 1);
+		# Store history
+		my %prev_state_1;
+		my %prev_state_2;
+		my %prev_change;
+		
+		foreach my $taxon (sort {$a <=> $b} keys %taxa_histories) {
+			
+			if ($taxa_histories{$taxon}->{$mutated_site}) { # this taxon HAS the mutated site
+				
+				my $mutation_history = $taxa_histories{$taxon}->{$mutated_site};
+				#print "mutation_history=$mutation_history\n";
+				
+				my @mutation_history_events = split(/,/, $mutation_history);
+#				
+#				#MULTIHIT
+#				if(@mutation_history_events > 1) {
+#					$multi_hit{$mutated_site} = 1;
+#				}
+#				
+#				# Store ordered events
+#				$site_to_alleles{$mutated_site}->{ordered_events} = \@mutation_history_events; #<--but this is only for ONE TAXON!
+#				
+				my $extant_nt = substr($mutation_history, -1);
+#				#print "extant_nt=$extant_nt\n";
+#				
+				# Store nucleotide
+				$site_to_alleles{$mutated_site}->{$extant_nt}++;
+#				
+				foreach my $event (@mutation_history_events) { # these are ordered, but won't matter with new approach
+#					
+					if ($event =~ /(\d+)\-\w\>\w/) {
+#						#91404-A>G
+#						#868627-G>A
+#						
+						my $generation = $1;
+#						my $state1 = $2;
+#						my $state2 = $3;
+#						
+#						#$site_to_alleles{$mutated_site}->{history}->{$event}++;
+						$site_to_alleles{$mutated_site}->{history}->{$generation}->{$event}++;
+#						
+#						if (! $back_mutation{$mutated_site}) {
+#							
+#								# Could be parallel or back
+#								if ($prev_change{"$state1\>$state2"}) {
+#									$recurrent_mutation{$mutated_site} = 1;
+#								}
+#								
+#								$prev_change{"$state1\>$state2"}++;
+#								
+#								# Could be parallel or back
+#								if ($prev_state_1{$state2}) {
+#									$back_mutation{$mutated_site} = 1;
+#								}
+#								
+#								$prev_state_1{$state1}++;
+#								$prev_state_2{$state2}++;
+#						}
+#						
+#						
+					}
+				}
+#				
+			} else { # this taxon does NOT have the mutated site, add the ancestral (seed)
+				$site_to_alleles{$mutated_site}->{$AA}++;
+			}
+		}
+	}
+	
+	
+	foreach my $taxon (sort {$a <=> $b} keys %taxa_histories) {
+		$num_taxa++; # COMEBACK -- will this capture ALL taxa in ALL situations? What if no history? I think yes.		
+	} # end all taxa
+	
+	my $out_line = '';
+	
+	#my %multi_hit;
+	my @nts = qw/A C G T/;
+	foreach my $mutated_site (sort {$a <=> $b} keys %site_to_alleles) {
+		#print "mutated_site=$mutated_site\n";
+		
+		# AA
+		my $AA = substr($seed_seq, $mutated_site - 1, 1);
+		
+		#print "AA=$AA\n";
+		
+		# Define REF as the major (consensus) allele
+		my $REF = '';
+		my $REF_count = 0;
+		my $arbitrary_REF = 0;
+#		my $running_total_nt = 0;
+#		my $running_total_variant_match_AA = 0;
+		
+		foreach my $nt (@nts) {
+#			my $this_nt_count = $site_to_alleles{$mutated_site}->{$nt};
+#			$running_total_nt += $this_nt_count;
+#			
+#			if ($nt eq $AA) {
+#				$running_total_variant_match_AA += $this_nt_count;
+			if ($site_to_alleles{$mutated_site}->{$nt} > $REF_count) {
+				$REF = $nt;
+				$REF_count = $site_to_alleles{$mutated_site}->{$nt};
+				$arbitrary_REF = 0;
+			} elsif ($site_to_alleles{$mutated_site}->{$nt} == $REF_count) {
+				$arbitrary_REF = 1;
+			}
+		}
+		
+		#print "REF=$REF\n";
+		
+		my $ALT = '';
+		my $AC = '';
+		my $AN_NS_DP = 0;
+		my $num_alleles = 0;
+		my @all_nts_present;
+		
+		foreach my $nt (@nts) {
+			#print "nt=$nt\n";
+			
+			if ($site_to_alleles{$mutated_site}->{$nt} > 0) { # here, possible that back mutation eliminates variation
+				#print "AC_prelude=" . $site_to_alleles{$mutated_site}->{$nt} . "\n";
+				#print "nt=$nt\n";
+				push(@all_nts_present, $nt);
+				
+				$AN_NS_DP += $site_to_alleles{$mutated_site}->{$nt};
+				$num_alleles++;
+				
+				if ($nt ne $REF) {
+					$ALT .= "$nt\,";
+					$AC .= $site_to_alleles{$mutated_site}->{$nt} . ',';
+				}
+			}
+		}
+		
+		# This will only happen if the sample is 100% REF; print it
+		if ($ALT eq '' && $AC eq '') {
+			$ALT = "$REF\,";
+			$AC = "$AN_NS_DP\,";
+		}
+		
+		chop($ALT);
+		chop($AC);
+		
+		#print "ALT=$ALT\nAC=$AC\n";
+		
+		# AFs
+		my $AF = '';
+		foreach my $nt (@nts) {
+			if ($nt ne $REF && $site_to_alleles{$mutated_site}->{$nt} > 0) {
+				my $this_AF = $site_to_alleles{$mutated_site}->{$nt} / $AN_NS_DP;
+				$AF .= "$this_AF\,";
+			}
+		}
+		
+		# This will only happen if the sample is 100% REF; print it
+		if ($AF eq '') {
+			$AF = "1\,";
+		}
+		
+		chop($AF);
+		
+		$out_line .= "$fasta_header\t$mutated_site\t.\t$REF\t$ALT\t100\tPASS\t";
+		$out_line .= "AC=$AC\;AF=$AF\;AN=$AN_NS_DP\;NS=$AN_NS_DP\;DP=$AN_NS_DP\;AA=$AA\;VT=SNP\;"; 
+		
+		# PROBLEM:
+		#HsGgAncestor_chr21_24000001_24100000	602	.	T	A	100	PASS	AC=2;AF=0.333333333333333;AN=6;NS=6;DP=6;AA=G;VT=SNP;MUTATIONS=G>T,G>A;GENERATIONS=214482,1006400;TAXA=4,2
+			#
+		
+		my $mutations;
+		my $generations;
+		my $taxa;
+		
+		# Sort the events in chronological order
+		#foreach my $event (%{$site_to_alleles{$mutated_site}->{history}}) {
+		
+		#print 'ordered_events=' . @{$site_to_alleles{$mutated_site}->{ordered_events}} . "\n";
+		#
+		#my $ordered_events_ref = $site_to_alleles{$mutated_site}->{ordered_events};
+		#my @ordered_events = @{$ordered_events_ref};
+		#
+		#for (my $event_index = 0; $event_index < @ordered_events; $event_index++) {
+		
+		my $hits = 0;
+		my %prev_change;
+		my %prev_state_1;
+		my %prev_state_2;
+		my $back_mutation = 0;
+		my $recurrent_mutation = 0;
+		
+		foreach my $generation (sort {$a <=> $b} keys %{$site_to_alleles{$mutated_site}->{history}}) {
+			#$site_to_alleles{$mutated_site}->{history}->{$generation}->{$event}++;
+			$hits++;
+			
+			# SHOULD ONLY BE ONE EVENT PER GENERATION
+			foreach my $event (%{$site_to_alleles{$mutated_site}->{history}->{$generation}}) {
+				
+				my $event_num = $site_to_alleles{$mutated_site}->{history}->{$generation}->{$event};
+				
+				if($event =~ /(\d+)\-([\>\w+]+)/) {
+					my $this_mutation = $2;
+					$mutations .= "$2\,";
+					$generations .= "$1\,";
+					#$taxa .= $site_to_alleles{$mutated_site}->{history}->{$event} . ',';
+					$taxa .= $event_num . ',';
+					
+					my @two_states = split(/,/, $this_mutation);
+					my $state1 = $two_states[0];
+					my $state2 = $two_states[1];
+					
+					# Could be recurrent/parallel
+					if ($prev_change{$this_mutation}) {
+						$recurrent_mutation++;
+					}
+					
+					$prev_change{$this_mutation}++;
+					
+					# Could be back mutation
+					if ($prev_state_1{$state2}) {
+						$back_mutation++;
+					}
+					
+					$prev_state_1{$state1}++;
+					$prev_state_2{$state2}++;
+				}
+			}
+		}
+		
+		chop($mutations);
+		chop($generations);
+		chop($taxa);
+		
+		$out_line .= "MUTATIONS=$mutations\;GENERATIONS=$generations\;TAXA=$taxa\;";
+		
+		if ($arbitrary_REF == 1) {
+			$out_line .= "ARBITRARY_REF\;";
+		}
+		
+		#if ($multi_hit{$mutated_site} == 1) {
+		if ($hits > 1) {
+			$out_line .= "MULTIHIT\;";
+		}
+		
+		if ($num_alleles > 2) {
+			$out_line .= "MULTIALLELIC\;";
+		}
+		
+		#if ($back_mutation{$mutated_site} == 1) {
+		if ($back_mutation > 0) {
+			$out_line .= "BACK_MUTATION\;";
+		}
+		
+		#if ($recurrent_mutation{$mutated_site} == 1) {
+		if ($recurrent_mutation > 0) {
+			$out_line .= "RECURRENT_MUTATION\;";
+		}
+		
+		if ($AF eq '1') {
+			if ($REF eq $AA) {
+				$out_line .= "INVARIANT_ANCESTRAL\;";
+			} else {
+				$out_line .= "INVARIANT_DERIVED\;";
+			}
+		}
+		
+		if ($REF ne $AA) {
+			my $match_AA = 0;
+			
+			foreach (@all_nts_present) {
+				if ($_ eq $AA) {
+					$match_AA = 1;
+				}
+			}
+			
+			# Unless we have a match to the ancestral allele SOMEWHERE
+			unless ($match_AA == 1) {
+				$out_line .= "NO_ANCESTRAL\;";
+			}
+		}
+		
+		chop($out_line);
+		
+		print OUT_TREVOLVER_VCF "$out_line\n";
+		
+		$out_line = '';
+	}
+	
+	close OUT_TREVOLVER_VCF;
+} # finish VCF output
 
 exit;
 
@@ -1162,6 +1562,7 @@ sub evolve_two_subtrees {
 			my $this_mutation_history = $mutation_history{$mutated_site};
 			chop($this_mutation_history); # get ride of last comma (,)
 			$taxa_histories{$taxon}->{$mutated_site} = $this_mutation_history;
+			$mutated_sites{$mutated_site} = 1;
 #			print "$mutated_site: $this_mutation_history\n";
 		}
 	} # END BASE CASE: a terminal taxon
@@ -1204,7 +1605,20 @@ sub print_usage_message {
 	print "\t--tracked_motif (OPTIONAL): a motif to track after each mutation. For example,\n" . 
 			"\t\tto report the number of CpG sites over the course of a run, specify CG.\n";
 	print "\t--track_mutations (OPTIONAL): reports the mutation rate and count over time.\n";
-	print "\t--verbose (OPTIONAL): tell trevolver to tell you EVERYTHING that happens.\n";
+	print "\t--excluded_taxa_list (OPTIONAL) [NOT YET SUPPORTED!]: path of file containing a\n" . 
+			"\t\tlist of taxa (comma-separated) to exclude from the VCF file and the consensus\n" . 
+			"\t\tsequence. This might be desirable if a small number of taxa represent outgroups,\n" . 
+			"\t\tto which polymorphism in an ingroup is being compared.\n";
+	print "\t--vcf_output (OPTIONAL): name of a VCF format output file to be placed in the working\n" . 
+			"\t\tdirectory unless a full path name is given.\n";
+	print "\t--print_consensus (OPTIONAL) [NOT YET SUPPORTED!]: prints the consensus sequence\n" . 
+			"\t\t(containing the REF allele, here defined as the major allele, at each site) in a\n" . 
+			"\t\tseparate output file.\n";
+	print "\t--suppress_ancestral_seq (OPTIONAL): suppress printing the ancestral (seed) sequence\n" . 
+			"\t\tin the output. This might be desirable if the seed sequence is very large and its\n" . 
+			"\t\tinclusion in the output consumes too much disk space.\n";
+	print "\t--verbose (OPTIONAL): tell trevolver to tell you EVERYTHING that happens.\n" . 
+			"\t\tNot recommended except for development and debugging purposes.\n";
 		
 	
 	print "\n################################################################################\n";
@@ -1219,14 +1633,15 @@ sub print_usage_message {
 	print "\n### EXAMPLE USING ALL OPTIONS:\n";
 	
 	print "\n\ttrevolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\\n" . 
-			"\t--branch_unit=144740 --random_seed=123456789 --tracked_motif=CG --track_mutations --verbose > my_output.txt\n";
+			"\t--branch_unit=144740 --random_seed=123456789 --tracked_motif=CG --track_mutations \\\n" . 
+			"\t--vcf_output=SNP_report.vcf --suppress_ancestral_seq --verbose > my_output.txt\n";
 	
 	print "\n### EXAMPLE OF TYPICAL USAGE (program decides random seed; not verbose):\n";
 	
 	print "\n\ttrevolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\\n" . 
-			"\t--branch_unit=144740 --tracked_motif=CG --track_mutations > my_output.txt\n";
+			"\t--branch_unit=144740 --tracked_motif=CG --track_mutations --vcf_output=SNP_report.vcf > my_output.txt\n";
 	
-	print "\n### EXAMPLE WITH EVEN FEWER OPTIONS AND OUTPUT TO SCREEN:\n";
+	print "\n### EXAMPLE USING MINIMUM OPTIONS WITH OUTPUT TO SCREEN:\n";
 	
 	print "\n\ttrevolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa --rate_matrix=my_mutations.txt \\\n" .
 			"\t--branch_unit=144740\n";
@@ -1240,7 +1655,6 @@ sub print_usage_message {
 
 
 exit;
-
 
 
 
