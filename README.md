@@ -1,6 +1,6 @@
-<img src="https://github.com/chasewnelson/trevolver/blob/master/trevolver_logo.png?raw=true" title="trevolver logo by Mitch Lin" alt="trevolver logo by Mitch Lin" align="middle">
+<img src="https://github.com/chasewnelson/trevolver/blob/master/trevolver_logo.png?raw=true" title="Trevolver logo by Mitch Lin" alt="Trevolver logo by Mitch Lin" align="middle">
 
-**trevolver** is a Perl program for simulating non-reversible DNA sequence evolution on a fixed bifurcating tree using trinucleotide context. It relies on no external dependencies, facilitating maximum portability. Just download and run.
+**Trevolver** is a Perl program for simulating non-reversible DNA sequence evolution on a fixed bifurcating tree using trinucleotide context. It relies on no external dependencies, facilitating maximum portability. Just download and run.
 
 To test the simulation with the example data, execute the following at the Unix command line or Mac Terminal:
 
@@ -25,23 +25,23 @@ Find more [examples](#examples) below.
 
 ## <a name="description"></a>Description
 
-New mutation data, including *de novo* mutations detected in whole genome sequencing of father/mother-child 'trios', can be used to empirically estimate context-dependent mutation rates. The most commonly used context is the trinucleotide, where the flanking nucleotide on either side of a position are considered (one 5', one 3'). Unfortunately, a tool is lacking for simulation of non-reversible (*i.e.*, asymmetric rates) DNA evolution on a fixed bifurcating (binary; fully resolved) gene tree, such as that produced by coalescence simulations. **trevolver** was made to fill this gap. The user must provide a bifurcating tree, a seed sequence, a 64 × 4 (trinucleotide × nucleotide) rate matrix, and a branch unit (see [options](#options)). **trevolver** outputs a <a target="_blank" rel="noopener noreferrer" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) SNP report for all tree tips (leaves; taxa), as well as the history of mutations and motifs for each lineage (see [output](#output)).
+New mutation data, including *de novo* mutations detected in whole genome sequencing of father/mother-child 'trios', can be used to empirically estimate context-dependent mutation rates. The most commonly used context is the trinucleotide, where the flanking nucleotide on either side of a position are considered (one 5', one 3'). Unfortunately, a tool is lacking for simulation of non-reversible (*i.e.*, asymmetric rates) DNA evolution on a fixed bifurcating (binary; fully resolved) gene tree, such as that produced by coalescence simulations. **Trevolver** was made to fill this gap. The user must provide a bifurcating tree, a seed sequence, a 64 × 4 (trinucleotide × nucleotide) rate matrix, and a branch unit (see [options](#options)). **Trevolver** outputs a <a target="_blank" rel="noopener noreferrer" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) SNP report for all tree tips (leaves; taxa), as well as the history of mutations and motifs for each lineage (see [output](#output)).
 
 ## <a name="how-it-works"></a>How it Works
 
-**trevolver** begins by placing the seed sequence on the root of the tree. It then proceeds to recursively traverse the tree from root to tip as an ordered binary tree structure. In other words, at each internal node, it processes the left child (and its left child, and so on) before processing the right child, where the left (first) descendant node is considered to be that which comes first using the alphabetic (not numeric) `sort()` function. Unique node ID's are assigned as the letter 'n' followed by an integer (*e.g.*, n5), where the root is considered n=1.
+**Trevolver** begins by placing the seed sequence on the root of the tree. It then proceeds to recursively traverse the tree from root to tip as an ordered binary tree structure. In other words, at each internal node, it processes the left child (and its left child, and so on) before processing the right child, where the left (first) descendant node is considered to be that which comes first using the alphabetic (not numeric) `sort()` function. Unique node ID's are assigned as the letter 'n' followed by an integer (*e.g.*, n5), where the root is considered n=1.
 
-When a single branch (as opposed to a cluster) is encountered, **trevolver** begins to evolve the sequence along the branch. If the parent node of the branch also happens to be the root, the seed (ancestral) sequence is used as a starting point. Otherwise, a new and temporary copy of the seed sequence is created, into which the most recent allele at each mutated site is imputed. This saves computer memory, as each node need only inherit its mutational history, not an entire sequence, from its predeccesor.
+When a single branch (as opposed to a cluster) is encountered, **Trevolver** begins to evolve the sequence along the branch. If the parent node of the branch also happens to be the root, the seed (ancestral) sequence is used as a starting point. Otherwise, a new and temporary copy of the seed sequence is created, into which the most recent allele at each mutated site is imputed. This saves computer memory, as each node need only inherit its mutational history, not an entire sequence, from its predeccesor.
 
-After a new sequence is initiated on a branch, it begins to evolve under trinucleotide-context-dependent mutation rates specified by the user input. The mutation rate matrix in **trevolver** follows the format of the forward-time simulation <a target="_blank" href="https://messerlab.org/slim/">**SLiM**</a> (Haller and Messer 2019): the 4<sup>3</sup> = 64 rows correspond to the initial states of the 64 alphabetically-ordered trinucleotides, while the 4 columns correspond to the possible derived states of the central nucleotide. For example, the third column of the first row should contain the AAA➞AGA mutation rate. Mutation rates for identities (*e.g.*, AAA➞AAA) should be 0.
+After a new sequence is initiated on a branch, it begins to evolve under trinucleotide-context-dependent mutation rates specified by the user input. The mutation rate matrix in **Trevolver** follows the format of the forward-time simulation <a target="_blank" href="https://messerlab.org/slim/">**SLiM**</a> (Haller and Messer 2019): the 4<sup>3</sup> = 64 rows correspond to the initial states of the 64 alphabetically-ordered trinucleotides, while the 4 columns correspond to the possible derived states of the central nucleotide. For example, the third column of the first row should contain the AAA➞AGA mutation rate. Mutation rates for identities (*e.g.*, AAA➞AAA) should be 0.
 
-When evolution begins on a branch, trevolver first calculates the overall mutation rate of the sequence of length *L* by tallying the *L* - 2 trinucleotides in the sequence (*i.e.*, the first and last nucleotides, lacking trinucleotide context, are ignored). The overall mutation rate of the sequence (*u*) is then used to calculate a random exponentially-distributed waiting time to the next mutation as *g*<sub>w</sub> = -(1 / *u*) × ln(*x*<sub>1</sub>) generations, where *x* is a random number between 0 (inclusive) and 1 (exclusive) (Yang 2014). If the expected waiting time (*g*<sub>w</sub>) is less than the length of the branch, a mutation occurs. The sequence is then examined one trinucleotide at a time, until the cumulative mutation rate along the sequence exceeds a second randomly chosen value between 0 (inclusive) and *u* (exclusive). A mutation then occurs at the central position of the first trinucleotide for which this condition holds and for which the mutation rate is greater than 0. Because of this context-dependence, it is possible for highly mutable trinucleotides to 'erode' over time, and the overall mutation rate of the sequence is an emergent (rather than pre-specified) value depending on the rate matrix. Indeed, and the overall mutation rate may decreased (or increase) until an equilibrium triuncleotide composition is reached.
+When evolution begins on a branch, **Trevolver** first calculates the overall mutation rate of the sequence of length *L* by tallying the *L* - 2 trinucleotides in the sequence (*i.e.*, the first and last nucleotides, lacking trinucleotide context, are ignored). The overall mutation rate of the sequence (*u*) is then used to calculate a random exponentially-distributed waiting time to the next mutation as *g*<sub>w</sub> = -(1 / *u*) × ln(*x*<sub>1</sub>) generations, where *x* is a random number between 0 (inclusive) and 1 (exclusive) (Yang 2014). If the expected waiting time (*g*<sub>w</sub>) is less than the length of the branch, a mutation occurs. The sequence is then examined one trinucleotide at a time, until the cumulative mutation rate along the sequence exceeds a second randomly chosen value between 0 (inclusive) and *u* (exclusive). A mutation then occurs at the central position of the first trinucleotide for which this condition holds and for which the mutation rate is greater than 0. Because of this context-dependence, it is possible for highly mutable trinucleotides to 'erode' over time, and the overall mutation rate of the sequence is an emergent (rather than pre-specified) value depending on the rate matrix. Indeed, and the overall mutation rate may decreased (or increase) until an equilibrium triuncleotide composition is reached.
 
-Happy trivolving!
+Happy Trevolving!
 
 ## <a name="options"></a>Options
 
-Call **trevolver** using the following options:
+Call **Trevolver** using the following options:
 
 * `--tree` (**REQUIRED**): file containing a bifurcating evolutionary tree in newick format with branch lengths. NO NODE NAMES OR SUPPORT VALUES AT THIS TIME. Only the first encountered tree is used, *i.e.*, embarassingly parallel analyses must be executed one level up.
 * `--seed_sequence` (**REQUIRED**): FASTA file containing starting (seed) sequence at tree root, to be evolved. Only the first sequence encountered is used.
@@ -57,10 +57,11 @@ Call **trevolver** using the following options:
 
 * `--track_mutations` (*OPTIONAL*): reports the mutation rate and count over time.
 * `--excluded_taxa_list` (*OPTIONAL*) [**NOT YET SUPPORTED!**]: path of file containing a list of taxa (comma-separated) to exclude from the VCF file and the consensus sequence. This might be desirable if a small number of taxa represent outgroups, to which polymorphism in an ingroup is being compared.
+* `--excluded_outgroup_count` (*OPTIONAL*) [**NOT YET SUPPORTED!**]: number of outgroups to be exluded for calculation of variant frequencies in the VCF file. Using this option, outgroups are considered to be terminal taxa (external branches) with the longest branch lengths. For example, if `--excluded_outgroup_count=2` is specified, the two extant taxa with the longest branches will be excluded.
 * `--vcf_output` (*OPTIONAL*): name of a [VCF format output file](#vcf-output) to be generated in the working directory, unless a full path name is given.
 * `--print_consensus` (*OPTIONAL*) [**NOT YET SUPPORTED!**]: prints the consensus sequence (containing the `REF` allele, here defined as the major allele, at each site) in a separate output file.
 * `--suppress_ancestral_seq` (*OPTIONAL*): suppress printing the ancestral (seed) sequence in the output. This might be desirable if the seed sequence is very large and its inclusion in the output consumes too much disk space.
-* `--verbose` (*OPTIONAL*): tell trevolver to tell you EVERYTHING that happens. Not recommended except for development and debugging purposes.
+* `--verbose` (*OPTIONAL*): tell Trevolver to tell you EVERYTHING that happens. Not recommended except for development and debugging purposes.
 
 ## <a name="examples"></a>EXAMPLES
 
@@ -93,11 +94,11 @@ Example input and output are available in the `EXAMPLE_INPUT` and `EXAMPLE_OUTPU
 
 ## <a name="output"></a>Output
 
-Depending on the options specified, **trevolver** will output data immediately following single lines containing `//` and a descriptor. The lines following `//MUTATION` contain a full mutation history; the lines following `//TRACKED` contain tracked mutation rates and/or motif data; and the lines following `//VCF` contain any output pertinent to the separate <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) file specified by the user, which contains a SNP report for taxon/leaf (terminal) nodes. More options will be available soon.
+Depending on the options specified, **Trevolver** will output data immediately following single lines containing `//` and a descriptor. The lines following `//MUTATION` contain a full mutation history; the lines following `//TRACKED` contain tracked mutation rates and/or motif data; and the lines following `//VCF` contain any output pertinent to the separate <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) file specified by the user, which contains a SNP report for taxon/leaf (terminal) nodes. More options will be available soon.
 
 ### <a name="vcf-output"></a>VCF Output
 
-The <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) output conforms to format VCFv4.1, such as used by the 1000 Genomes Project GRCh38/hg38 release, with some notable exceptions. The `REF` (reference) allele is defined as the consensus (major) allele, which may or may not match the `AA` (ancestral allele). A consensus sequence is printed in a separate file for convenience (`--print_consensus`). First, additional metadata headers (lines beginning with `##`) are used to indicate arguments used as **trevolver** input, for convenience and reproducibility. Headers that are irrelevant (*e.g.*, non-single nucleotide variant descriptors) have been removed. Additionally, six data types have been added to the `INFO` column:
+The <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) output conforms to format VCFv4.1, such as used by the 1000 Genomes Project GRCh38/hg38 release, with some notable exceptions. The `REF` (reference) allele is defined as the consensus (major) allele, which may or may not match the `AA` (ancestral allele). A consensus sequence is printed in a separate file for convenience (`--print_consensus`). First, additional metadata headers (lines beginning with `##`) are used to indicate arguments used as **Trevolver** input, for convenience and reproducibility. Headers that are irrelevant (*e.g.*, non-single nucleotide variant descriptors) have been removed. Additionally, six data types have been added to the `INFO` column:
 
 * `MUTATIONS`: all unique mutations that have occurred at this site, *e.g.*, `G>A`. Multiple mutations are comma-separated (*e.g.*, `G>A,A>G`) in **chronological order**, for convenience in downstream analyses.
 * `GENERATIONS`: time (generation) at which the unique mutation(s) occurred, comma-separated in the same order (**chronological**).
@@ -111,7 +112,7 @@ The <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call
 
 ## <a name="troubleshooting"></a>Troubleshooting
 
-If you have questions about **trevolver**, please click on the <a target="_blank" href="https://github.com/chasewnelson/trevolver/issues">Issues</a> tab at the top of this page and begin a new thread, so that others might benefit from the discussion.
+If you have questions about **Trevolver**, please click on the <a target="_blank" href="https://github.com/chasewnelson/trevolver/issues">Issues</a> tab at the top of this page and begin a new thread, so that others might benefit from the discussion.
 
 * **Simulating a single sequence.** It is entirely possible to simulate the evolution of a single sequence. Simply provide a tree with only one taxon and branch length. For example, to simulate the evolution of a single sequence named "my_creature" for 1 million generations, the tree file would contain, simply, `(my_creature:1000000);`. Provide a scaling factor (`--branch_unit`) of 1, and you're good to go:
 
@@ -119,20 +120,20 @@ If you have questions about **trevolver**, please click on the <a target="_blank
 		--rate_matrix=mutation_equal.txt --branch_unit=1 > example4_output.txt
 
 ## <a name="acknowledgments"></a>Acknowledgments
-**trevolver** was written with support from a Gerstner Scholars Fellowship from the Gerstner Family Foundation at the American Museum of Natural History to C.W.N. (2016-2019), and is maintained with support from the same. The logo image was designed by Mitch Lin (2019); copyright-free DNA helix obtained from Pixabay. Thanks to Reed A. Cartwright, Michael Dean, Dan Graur, Ming-Hsueh Lin, Lisa Mirabello, and Meredith Yeager for discussion.
+**Trevolver** was written with support from a Gerstner Scholars Fellowship from the Gerstner Family Foundation at the American Museum of Natural History to C.W.N. (2016-2019), and is maintained with support from the same. The logo image was designed by Mitch Lin (2019); copyright-free DNA helix obtained from Pixabay. Thanks to Reed A. Cartwright, Michael Dean, Dan Graur, Ming-Hsueh Lin, Lisa Mirabello, and Meredith Yeager for discussion.
 
 ## <a name="citation"></a>Citation
 
 When using this software, please refer to and cite:
 
->Nelson CW, Fu Y, Li W-H (*in preparation*) trevolver: simulating non-reversible DNA sequence evolution in trinucleotide context on a bifurcating tree.
+>Nelson CW, Fu Y, Li W-H (*in preparation*) Trevolver: simulating non-reversible DNA sequence evolution in trinucleotide context on a bifurcating tree.
 
 and this page:
 
 >https://github.com/chasewnelson/trevolver
 
 ## <a name="contact"></a>Contact
-If you have questions about **trevolver**, please click on the <a target="_blank" href="https://github.com/chasewnelson/trevolver/issues">Issues</a> tab at the top of this page and begin a new thread, so that others might benefit from the discussion.
+If you have questions about **Trevolver**, please click on the <a target="_blank" href="https://github.com/chasewnelson/trevolver/issues">Issues</a> tab at the top of this page and begin a new thread, so that others might benefit from the discussion.
 
 Other correspondence should be addressed to Chase W. Nelson: 
 
