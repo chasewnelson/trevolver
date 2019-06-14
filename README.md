@@ -1,11 +1,11 @@
 <img src="https://github.com/chasewnelson/trevolver/blob/master/trevolver_logo.png?raw=true" title="trevolver logo by Mitch Lin" alt="trevolver logo by Mitch Lin" align="middle">
 
-**trevolver** is a Perl program for simulating non-reversible DNA sequence evolution on a fixed bifurcating tree using trinucleotide context. It relies on no external dependencies, facilitating maximum portability.
+**trevolver** is a Perl program for simulating non-reversible DNA sequence evolution on a fixed bifurcating tree using trinucleotide context. It relies on no external dependencies, facilitating maximum portability. Just download and run.
 
-To test the simulation with the example data, run the following at the Unix command line or Mac Terminal:
+To test the simulation with the example data, execute the following at the Unix command line or Mac Terminal:
 
 	trevolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa \
-	--rate_matrix=mutation_CpGx20.txt --branch_unit=144740 > output.txt
+	--rate_matrix=mutation_CpGx20.txt --branch_unit=144740 > example1_output.txt
 
 Find more [examples](#examples) below.
 
@@ -16,8 +16,10 @@ Find more [examples](#examples) below.
 * [Options](#options)
 * [Examples](#examples)
 * [Output](#output)
+	* [VCF Output](#vcf-output)
 * [Troubleshooting](#troubleshooting)
 * [Acknowledgments](#acknowledgments)
+* [Citation](#citation)
 * [Contact](#contact)
 * [References](#references)
 
@@ -39,24 +41,30 @@ Happy trivolving!
 
 ## <a name="options"></a>Options
 
-Call trevolver using the following options:
+Call **trevolver** using the following options:
 
 * `--tree` (**REQUIRED**): file containing a bifurcating evolutionary tree in newick format with branch lengths. NO NODE NAMES OR SUPPORT VALUES AT THIS TIME. Only the first encountered tree is used, *i.e.*, embarassingly parallel analyses must be executed one level up.
 * `--seed_sequence` (**REQUIRED**): FASTA file containing starting (seed) sequence at tree root, to be evolved. Only the first sequence encountered is used.
 * `--rate_matrix` (**REQUIRED**): file containing 64 × 4 tab-delimited trinucleotide rate matrix where rows and columns are in alphabetical order. For example, values in the first row correspond to AAA➞AAA, AAA➞ACA, AAA➞AGA, and AAA➞ATA.
 * `--branch_unit` (**REQUIRED**): a scaling factor, equal to 2*N*<sub>0</sub> or 4*N*<sub>0</sub> in most coalescent simulations (*e.g.*, <a target="_blank" href="https://home.uchicago.edu/rhudson1/source/mksamples.html">**ms**</a>; Hudson 2002), which can be multiplied by a branch length to obtain the length of the lineage in generations. Branch lengths will be multiplied by this value and rounded up to the nearest integer to determine number of generations. For example, given the value 144740, a branch length of 0.228826612 in the phylogenetic tree would correspond to 144740 × 0.228826612 = 33,120.364 generations.
-* `--random_seed` (OPTIONAL): integer with which to seed the random number generator. If not supplied, one will be chosen and reported. More specifically, we implement the checksum approach given in <a target="_blank" href="https://en.wikipedia.org/wiki/Programming_Perl">*Programming Perl*</a>: 
+* `--random_seed` (*OPTIONAL*): integer with which to seed the random number generator. If not supplied, one will be chosen and reported. More specifically, we implement the checksum approach given in <a target="_blank" href="https://en.wikipedia.org/wiki/Programming_Perl">*Programming Perl*</a>: 
 
 		srand(time ^ $$ ^ unpack "%32L*", `ps wwaxl | gzip`)
 		
-* `--tracked_motif` (OPTIONAL): a motif to track after each mutation. For example, to report the number of CpG sites over the course of a run, specify CG:
+* `--tracked_motif` (*OPTIONAL*): a motif to track after each mutation. For example, to report the number of CpG sites over the course of a run, specify CG:
 
 		--tracked_motif=CG
 
-* `--track_mutations` (OPTIONAL): reports the mutation rate and count over time.
-* `--verbose` (OPTIONAL): tell trevolver to tell you EVERYTHING that happens.
+* `--track_mutations` (*OPTIONAL*): reports the mutation rate and count over time.
+* `--excluded_taxa_list` (*OPTIONAL*) [**NOT YET SUPPORTED!**]: path of file containing a list of taxa (comma-separated) to exclude from the VCF file and the consensus sequence. This might be desirable if a small number of taxa represent outgroups, to which polymorphism in an ingroup is being compared.
+* `--vcf_output` (*OPTIONAL*): name of a [VCF format output file](#vcf-output) to be generated in the working directory, unless a full path name is given.
+* `--print_consensus` (*OPTIONAL*) [**NOT YET SUPPORTED!**]: prints the consensus sequence (containing the `REF` allele, here defined as the major allele, at each site) in a separate output file.
+* `--suppress_ancestral_seq` (*OPTIONAL*): suppress printing the ancestral (seed) sequence in the output. This might be desirable if the seed sequence is very large and its inclusion in the output consumes too much disk space.
+* `--verbose` (*OPTIONAL*): tell trevolver to tell you EVERYTHING that happens. Not recommended except for development and debugging purposes.
 
 ## <a name="examples"></a>EXAMPLES
+
+Example input and output are available in the `EXAMPLE_INPUT` and `EXAMPLE_OUTPUT` directories at this GitHub page, where reproducible examples are numbered (*e.g.*, **example1_output.txt**). When the random seed has not been specified, exact results can be reproduced by using the same random number seed reported in the example output.
 
 ### FORMAT:
 
@@ -66,35 +74,62 @@ Call trevolver using the following options:
 	
 ### ALL OPTIONS USED:
 
-	trevolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa \
-	--rate_matrix=my_mutations.txt  --branch_unit=144740 \
-	--random_seed=123456789 --tracked_motif=CG --track_mutations \
-	--verbose > my_output.txt
+	trevolver.pl --tree=tree_7taxa.txt \
+	--seed_sequence=seed_sequence.fa --rate_matrix=mutation_equal.txt \
+	--branch_unit=144740 --random_seed=123456789 --tracked_motif=CG \
+	--track_mutations --vcf_output=example2_SNP_report.vcf \
+	--suppress_ancestral_seq --verbose > example2_output.txt
 	
 ### TYPICAL USAGE (program decides random seed; not verbose):
 
-	trevolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa \
-	--rate_matrix=my_mutations.txt --branch_unit=144740 \
-	--tracked_motif=CG --track_mutations > my_output.txt
+	trevolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa \
+	--rate_matrix=mutation_CpGx20.txt --branch_unit=144740 --track_mutations \
+	--tracked_motif=CG --vcf_output=example3_SNP_report.vcf > example3_output.txt
 
-### EVEN FEWER OPTIONS AND OUTPUT TO SCREEN:
+### MINIMUM OPTIONS, WITH OUTPUT TO SCREEN:
 
-	trevolver.pl --tree=my_tree.txt --seed_sequence=my_ancestor.fa \
-	--rate_matrix=my_mutations.txt --branch_unit=144740
+	trevolver.pl --tree=tree_7taxa.txt --seed_sequence=seed_sequence.fa \
+	--rate_matrix=mutation_CpGx20.txt --branch_unit=1447
 
 ## <a name="output"></a>Output
 
-Depending on the options specified, **trevolver** will output a full mutation history and tracked information (mutation rates and motifs), immediately following single lines containing `//`. Soon, convenience functions will be available to output a <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) SNP report for leaf (terminal) nodes, and/or full sequences for some/all nodes.
+Depending on the options specified, **trevolver** will output data immediately following single lines containing `//` and a descriptor. The lines following `//MUTATION` contain a full mutation history; the lines following `//TRACKED` contain tracked mutation rates and/or motif data; and the lines following `//VCF` contain any output pertinent to the separate <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) file specified by the user, which contains a SNP report for taxon/leaf (terminal) nodes. More options will be available soon.
+
+### <a name="vcf-output"></a>VCF Output
+
+The <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) output conforms to format VCFv4.1, such as used by the 1000 Genomes Project GRCh38/hg38 release, with some notable exceptions. The `REF` (reference) allele is defined as the consensus (major) allele, which may or may not match the `AA` (ancestral allele). A consensus sequence is printed in a separate file for convenience (`--print_consensus`). First, additional metadata headers (lines beginning with `##`) are used to indicate arguments used as **trevolver** input, for convenience and reproducibility. Headers that are irrelevant (*e.g.*, non-single nucleotide variant descriptors) have been removed. Additionally, six data types have been added to the `INFO` column:
+
+* `MUTATIONS`: all unique mutations that have occurred at this site, *e.g.*, `G>A`. Multiple mutations are comma-separated (*e.g.*, `G>A,A>G`) in **chronological order**, for convenience in downstream analyses.
+* `GENERATIONS`: time (generation) at which the unique mutation(s) occurred, comma-separated in the same order (**chronological**).
+* `TAXA`: number of taxa which share the unique mutation(s), comma-separated in the same order (**chronological**).
+* `ARBITRARY_REF`: flag indicating there was a tie for the major/consensus/most common allele at this site. If the highest allele frequency is shared by two alleles, the one that comes first alphabetically is reported.
+* `MULTIHIT`: flag indicating a site has experienced more than one mutation, in either the same or a distinct lineage.
+* `MULTIALLELIC`: flag indicating a site has multiple minor (non-reference) alleles (*i.e.*, >2 alleles). All multiallelic sites are multihit, but the reverse is not true.
+* `BACK_MUTATION`: flag indicating a site has experience back mutation, returning to a previous state/allele. All sites with back mutation have experienced multiple hits, but the reverse is not true.
+* `INVARIANT_ANCESTRAL`: flag indicating a site has no polymorphism in the extant taxa (leaves), and that the fixed state matches the ancestral allele (AA). This implies a mutation has occurred in the history of the site, but that the derived allele was lost via back mutation.
+* `INVARIANT_DERIVED`: flag indicating a site has no polymorphism in the extant taxa (leaves), and that the fixed state matches a derived allele that resulted from mutation. This implies a mutation occurred at least once in the history of the site, and that all extant sequences are descended from a mutated ancestor.
 
 ## <a name="troubleshooting"></a>Troubleshooting
 
+If you have questions about **trevolver**, please click on the <a target="_blank" href="https://github.com/chasewnelson/trevolver/issues">Issues</a> tab at the top of this page and begin a new thread, so that others might benefit from the discussion.
+
 * **Simulating a single sequence.** It is entirely possible to simulate the evolution of a single sequence. Simply provide a tree with only one taxon and branch length. For example, to simulate the evolution of a single sequence named "my_creature" for 1 million generations, the tree file would contain, simply, `(my_creature:1000000);`. Provide a scaling factor (`--branch_unit`) of 1, and you're good to go:
 
-		trevolver.pl --tree=my_branch.txt --seed_sequence=my_ancestor.fa \
-		--rate_matrix=my_mutations.txt --branch_unit=1
+		trevolver.pl --tree=tree_1taxon.txt --seed_sequence=seed_sequence.fa \
+		--rate_matrix=mutation_equal.txt --branch_unit=1 > example4_output.txt
 
 ## <a name="acknowledgments"></a>Acknowledgments
-**trevolver** was written by with support from a Gerstner Scholars Fellowship from the Gerstner Family Foundation at the American Museum of Natural History to C.W.N. (2016-2019), and is maintained with support from the same. The logo image was designed by Mitch Lin (2019); copyright-free DNA helix obtained from Pixabay.
+**trevolver** was written with support from a Gerstner Scholars Fellowship from the Gerstner Family Foundation at the American Museum of Natural History to C.W.N. (2016-2019), and is maintained with support from the same. The logo image was designed by Mitch Lin (2019); copyright-free DNA helix obtained from Pixabay. Thanks to Reed A. Cartwright, Michael Dean, Dan Graur, Ming-Hsueh Lin, Lisa Mirabello, and Meredith Yeager for discussion.
+
+## <a name="citation"></a>Citation
+
+When using this software, please refer to and cite:
+
+>Nelson CW, Fu Y, Li W-H (*in preparation*) trevolver: simulating non-reversible DNA sequence evolution in trinucleotide context on a bifurcating tree.
+
+and this page:
+
+>https://github.com/chasewnelson/trevolver
 
 ## <a name="contact"></a>Contact
 If you have questions about **trevolver**, please click on the <a target="_blank" href="https://github.com/chasewnelson/trevolver/issues">Issues</a> tab at the top of this page and begin a new thread, so that others might benefit from the discussion.
@@ -105,6 +140,6 @@ Other correspondence should be addressed to Chase W. Nelson:
 
 ## <a name="references"></a>References
 
-* Haller BC, Messer PW. 2019. SLiM 3: forward genetic simulations beyond the Wright–Fisher model. *Molecular Biology and Evolution* **36**:632–637.
-* Hudson RR. 2002. Generating samples under a Wright-Fisher neutral model of genetic variation. *Bioinformatics* **18**:337–338.
-* Yang Z. 2014. *Molecular Evolution: A Statistical Approach*. New York, NY: Oxford University Press.
+* Haller BC, Messer PW. 2019. <a target="_blank" href="https://academic.oup.com/mbe/article/36/3/632/5229931">SLiM 3: forward genetic simulations beyond the Wright–Fisher model</a>. *Molecular Biology and Evolution* **36**:632–637.
+* Hudson RR. 2002. <a target="_blank" href="https://academic.oup.com/bioinformatics/article/18/2/337/225783">Generating samples under a Wright-Fisher neutral model of genetic variation</a>. *Bioinformatics* **18**:337–338.
+* Yang Z. 2014. <a target="_blank" href="https://www.oxfordscholarship.com/view/10.1093/acprof:oso/9780199602605.001.0001/acprof-9780199602605">*Molecular Evolution: A Statistical Approach*</a>. New York, NY: Oxford University Press.
