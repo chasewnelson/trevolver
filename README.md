@@ -56,8 +56,8 @@ Call **Trevolver** using the following options:
 		--tracked_motif=CG
 
 * `--track_mutations` (*OPTIONAL*): reports the mutation rate and count over time.
-* `--excluded_taxa_list` (*OPTIONAL*) [**NOT YET SUPPORTED!**]: path of file containing a list of taxa (comma-separated) to exclude from the VCF file and the consensus sequence. This might be desirable if a small number of taxa represent outgroups, to which polymorphism in an ingroup is being compared.
-* `--excluded_outgroup_count` (*OPTIONAL*) [**NOT YET SUPPORTED!**]: number of outgroups to be exluded for calculation of variant frequencies in the VCF file. Using this option, outgroups are considered to be terminal taxa (external branches) with the longest branch lengths. For example, if `--excluded_outgroup_count=2` is specified, the two extant taxa with the longest branches will be excluded.
+* `--excluded_taxa` (*OPTIONAL*) [**NOT YET SUPPORTED!**]: path of file containing a list of taxa **names** (comma-separated) to exclude from the VCF file and the consensus sequence. This might be desirable if a small number of taxa represent outgroups, to which polymorphism in an ingroup is being compared.
+* `--excluded_outgroups` (*OPTIONAL*) [**NOT YET SUPPORTED!**]: **number** of outgroups to be excluded for calculation of variant frequencies in the VCF file. Using this option, outgroups are considered to be terminal taxa (external branches) if they have the longest branch lengths. For example, if `--excluded_outgroups=2` is specified, the two extant taxa with the longest branches will be excluded.
 * `--vcf_output` (*OPTIONAL*): name of a [VCF format output file](#vcf-output) to be generated in the working directory, unless a full path name is given.
 * `--print_consensus` (*OPTIONAL*) [**NOT YET SUPPORTED!**]: prints the consensus sequence (containing the `REF` allele, here defined as the major allele, at each site) in a separate output file.
 * `--suppress_ancestral_seq` (*OPTIONAL*): suppress printing the ancestral (seed) sequence in the output. This might be desirable if the seed sequence is very large and its inclusion in the output consumes too much disk space.
