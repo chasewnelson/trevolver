@@ -51,10 +51,7 @@ Call **Trevolver** using the following options:
 
 		srand(time ^ $$ ^ unpack "%32L*", `ps wwaxl | gzip`)
 		
-* `--tracked_motif` (*OPTIONAL*): a motif to track after each mutation. For example, to report the number of CpG sites over the course of a run, specify CG:
-
-		--tracked_motif=CG
-
+* `--tracked_motif` (*OPTIONAL*): a motif to track after each mutation. For example, to report the number of CpG sites over the course of a run, specify CG like so: `--tracked_motif=CG`.
 * `--track_mutations` (*OPTIONAL*): reports the mutation rate and count over time.
 * `--excluded_taxa` (*OPTIONAL*) [**NOT YET SUPPORTED!**]: path of file containing a list of taxa **names** (comma-separated) to exclude from the VCF file and the consensus sequence. This might be desirable if a small number of taxa represent outgroups, to which polymorphism in an ingroup is being compared.
 * `--excluded_outgroups` (*OPTIONAL*) [**NOT YET SUPPORTED!**]: **number** of outgroups to be excluded for calculation of variant frequencies in the VCF file. Using this option, outgroups are considered to be terminal taxa (external branches) if they have the longest branch lengths. For example, if `--excluded_outgroups=2` is specified, the two extant taxa with the longest branches will be excluded.
@@ -94,7 +91,13 @@ Example input and output are available in the `EXAMPLE_INPUT` and `EXAMPLE_OUTPU
 
 ## <a name="output"></a>Output
 
-Depending on the options specified, **Trevolver** will output data immediately following single lines containing `//` and a descriptor. The lines following `//MUTATION` contain a full mutation history; the lines following `//TRACKED` contain tracked mutation rates and/or motif data; and the lines following `//VCF` contain any output pertinent to the separate <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) file specified by the user, which contains a SNP report for taxon/leaf (terminal) nodes. More options will be available soon.
+Depending on the options specified, **Trevolver** will output data immediately following single lines containing `//` and a descriptor.
+
+### <a name="standard-output"></a>Standard Output
+
+* `//MUTATION`: the following lines contain a full mutation history with three columns: taxon, site, and mutation. The mutation column data is in the format `[generation]-[ancestral allele]>[derived allele]`. For example, a C>T mutation which occurred in generation 1,988 would be listed as `1988-C>T`.
+* `//TRACKED`: the following lines contain tracked mutation rates and/or motif data with five columns: lineage, generation, mutation\_rate, mutation\_count, and motif\_count.
+* `//VCF`: the following lines contain any output pertinent to the separate <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) file specified by the user, which contains a SNP report for taxon/leaf (terminal) nodes. More options will be available soon.
 
 ### <a name="vcf-output"></a>VCF Output
 
@@ -120,13 +123,13 @@ If you have questions about **Trevolver**, please click on the <a target="_blank
 		--rate_matrix=mutation_equal.txt --branch_unit=1 > example4_output.txt
 
 ## <a name="acknowledgments"></a>Acknowledgments
-**Trevolver** was written with support from a Gerstner Scholars Fellowship from the Gerstner Family Foundation at the American Museum of Natural History to C.W.N. (2016-2019), and is maintained with support from the same. The logo image was designed by Mitch Lin (2019); copyright-free DNA helix obtained from Pixabay. Thanks to Reed A. Cartwright, Michael Dean, Dan Graur, Ming-Hsueh Lin, Lisa Mirabello, and Meredith Yeager for discussion.
+**Trevolver** was written with support from a Gerstner Scholars Fellowship from the Gerstner Family Foundation at the American Museum of Natural History to C.W.N. (2016-2019), and is maintained with support from the same. The logo image was designed by Mitch Lin (2019); copyright-free DNA helix obtained from Pixabay. Thanks to Reed A. Cartwright, Michael Dean, Dan Graur, Ming-Hsueh Lin, Lisa Mirabello, Michael Tessler, and Meredith Yeager for discussion.
 
 ## <a name="citation"></a>Citation
 
 When using this software, please refer to and cite:
 
->Nelson CW, Fu Y, Li W-H (*in preparation*) Trevolver: simulating non-reversible DNA sequence evolution in trinucleotide context on a bifurcating tree.
+>Nelson CW, Fu Y, Li W-H. Trevolver: simulating non-reversible DNA sequence evolution in trinucleotide context on a bifurcating tree. Submitted to *Bioinformatics*.
 
 and this page:
 
