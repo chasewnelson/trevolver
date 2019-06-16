@@ -15,7 +15,7 @@
 # DATE CREATED: June 2019
 # AUTHOR: Chase W. Nelson
 # CONTACT1: cnelson@amnh.org
-# AFFILIATION: Institute for Comparative Genomics, American Museum of Natural History, 
+# AFFILIATION: Sackler Institute for Comparative Genomics, American Museum of Natural History, 
 #	New York, NY 10024, USA
 
 # ACKNOWLEDGMENTS: written by C.W.N. with support from a Gerstner Scholars Fellowship from
@@ -33,6 +33,7 @@ my $local_time1 = localtime;
 
 my @commands = @ARGV;
 
+
 #########################################################################################
 # INITIALIZE INPUT VARIABLES
 my $tree; # file containing bifurcating evolutionary tree with branch lengths
@@ -43,6 +44,7 @@ my $random_seed; # integer with which to seed the random number generator
 my $tracked_motif;
 my $track_mutations;
 my $vcf_output;
+my $excluded_taxa;
 my $suppress_ancestral_seq;
 my $verbose;
 
@@ -55,6 +57,7 @@ GetOptions( "tree=s" => \$tree,
 			"tracked_motif=s" => \$tracked_motif,
 			"track_mutations" => \$track_mutations,
 			"vcf_output=s" => \$vcf_output,
+			"excluded_taxa=s" => \$excluded_taxa,
 			"suppress_ancestral_seq" => \$suppress_ancestral_seq,
 			"verbose" => \$verbose
 			)
@@ -290,6 +293,48 @@ if($random_seed) {
 
 
 ##########################################################################################
+# Read in the excluded taxa names
+my %excluded_taxa_names;
+
+if ($excluded_taxa) {
+	if (-f "$excluded_taxa") {
+		open(IN_EXCLUDED_TAXA, "$excluded_taxa");
+		
+		if($verbose) {
+			print "\n################################################################################";
+			print "\nRecording excluded taxa from $excluded_taxa...\n";
+		}
+		
+		while(<IN_EXCLUDED_TAXA>) {
+			chomp;
+			my $line = $_;
+			
+			if($line =~ /\w/) {
+				my @this_line_taxa = split(/\,\s*/, $line);
+				
+				print "\nEXCLUDED TAXA NAMES: ";
+				
+				my $excluded_taxa_line = '';
+				foreach (@this_line_taxa) {
+					$excluded_taxa_names{$_} = 1;
+					$excluded_taxa_line .= "$_\,";
+				}
+				
+				chop($excluded_taxa_line);
+				
+				print "$excluded_taxa_line\n";
+			}
+		}
+		
+		close IN_EXCLUDED_TAXA;
+		
+	} else {
+		print "\n### WARNING: could not open file $excluded_taxa\. Excluding no taxa.\n";
+	}
+}
+
+
+##########################################################################################
 # STORE THE TREE AS A MULTIDMINENSIONAL HASH
 
 if ($verbose) {
@@ -314,9 +359,11 @@ unless($suppress_ancestral_seq) {
 print "\nTREE: $tree\n";
 
 ##########################################################################################
-# THE SIMULATION: recursive evolution approach using the subroutine &evolve_two_subtrees()
+# THE SIMULATION: recursive evolution approach using the subroutine evolve_two_subtrees()
 ##########################################################################################
 evolve_two_subtrees($tree, 0, 0, 'n1=root,');
+##########################################################################################
+##########################################################################################
 
 
 ##########################################################################################
@@ -385,13 +432,13 @@ if($track_mutations || $tracked_motif) {
 
 
 ##########################################################################################
-### PRINT VCF FILE
+##########################################################################################
+### VCF output
+##########################################################################################
+##########################################################################################
 if ($vcf_output =~ /\w+/) {
 	chomp($vcf_output);
-#	my @local_time = localtime;
-#	my $year = $local_time[5];
-#	my $month = $local_time[4];
-#	my $day = $local_time[3];
+	
 	my (undef, undef, undef, $day, $month, $year) = localtime;
 	$year = $year + 1900;
 	$month += 1;
@@ -399,12 +446,9 @@ if ($vcf_output =~ /\w+/) {
 	if (length($day) == 1) { $day = "0$day" }
 	my $today = "$year$month$day";
 	
-#	print "\nworking_directory=$working_directory\n";
-	
 	if ($vcf_output =~ /\//) { # a path was provided
 		my $vcf_output_dir = $vcf_output;
 		$vcf_output_dir =~ s/\/[^\/]+$//;
-		#print "\nvcf_output_dir=$vcf_output_dir\n";
 		
 		if (-d "$vcf_output_dir") {
 			if (-f "$vcf_output") { # file already exist?
@@ -427,9 +471,7 @@ if ($vcf_output =~ /\w+/) {
 	
 	open(OUT_TREVOLVER_VCF, ">>$vcf_output");
 	print OUT_TREVOLVER_VCF "##fileformat=VCFv4.1\n" . 
-		"##FILTER=<ID=PASS,Description=\"All filters passed\">\n" . 
-#		"##fileDate=$year$month$day\n" .
-#		"##fileDate=<Description=\"" . localtime . "\">\n" . 
+		"##FILTER=<ID=PASS,Description=\"All filters passed\">\n" .
 		"##fileDate=$today\n" . 
 		"##reference=https://github.com/chasewnelson/trevolver\n" . 
 		"##source=<TREVOLVER,Description=\"trevolver.pl @commands\">\n" . 
@@ -458,14 +500,10 @@ if ($vcf_output =~ /\w+/) {
 		"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
 	
 	my %site_to_alleles;
+	my %site_to_outgroups;
 	
-#	my %multi_hit;
-#	my %back_mutation;
-#	my %recurrent_mutation;
 	my $num_taxa = 0;
-						
-	### BETTER WAY TO DO IT: first store ALL mutated sites somewhere. Loop through THOSE here below.
-	### If the current taxon HAS it, do what you do here. If NOT, then simply add the AA state. Takes care of everything later.
+	my $num_outgroups = 0;
 	
 	# KEYS of %mutated_sites
 	foreach my $mutated_site (sort {$a <=> $b} keys %mutated_sites) {
@@ -477,72 +515,86 @@ if ($vcf_output =~ /\w+/) {
 		my %prev_change;
 		
 		foreach my $taxon (sort {$a <=> $b} keys %taxa_histories) {
-			
-			if ($taxa_histories{$taxon}->{$mutated_site}) { # this taxon HAS the mutated site
+		
+			# OUTGROUP(S), if any
+			if ($excluded_taxa_names{$taxon}) {
 				
-				my $mutation_history = $taxa_histories{$taxon}->{$mutated_site};
-				#print "mutation_history=$mutation_history\n";
-				
-				my @mutation_history_events = split(/,/, $mutation_history);
-#				
-#				#MULTIHIT
-#				if(@mutation_history_events > 1) {
-#					$multi_hit{$mutated_site} = 1;
-#				}
-#				
-#				# Store ordered events
-#				$site_to_alleles{$mutated_site}->{ordered_events} = \@mutation_history_events; #<--but this is only for ONE TAXON!
-#				
-				my $extant_nt = substr($mutation_history, -1);
-#				#print "extant_nt=$extant_nt\n";
-#				
-				# Store nucleotide
-				$site_to_alleles{$mutated_site}->{$extant_nt}++;
-#				
-				foreach my $event (@mutation_history_events) { # these are ordered, but won't matter with new approach
-#					
-					if ($event =~ /(\d+)\-\w\>\w/) {
-#						#91404-A>G
-#						#868627-G>A
-#						
-						my $generation = $1;
-#						my $state1 = $2;
-#						my $state2 = $3;
-#						
-#						#$site_to_alleles{$mutated_site}->{history}->{$event}++;
-						$site_to_alleles{$mutated_site}->{history}->{$generation}->{$event}++;
-#						
-#						if (! $back_mutation{$mutated_site}) {
-#							
-#								# Could be parallel or back
-#								if ($prev_change{"$state1\>$state2"}) {
-#									$recurrent_mutation{$mutated_site} = 1;
-#								}
-#								
-#								$prev_change{"$state1\>$state2"}++;
-#								
-#								# Could be parallel or back
-#								if ($prev_state_1{$state2}) {
-#									$back_mutation{$mutated_site} = 1;
-#								}
-#								
-#								$prev_state_1{$state1}++;
-#								$prev_state_2{$state2}++;
-#						}
-#						
-#						
+				if ($taxa_histories{$taxon}->{$mutated_site}) { # this taxon HAS the mutated site
+					
+					my $mutation_history = $taxa_histories{$taxon}->{$mutated_site};
+					#print "mutation_history=$mutation_history\n";
+					
+					my @mutation_history_events = split(/,/, $mutation_history);
+	
+					my $extant_nt = substr($mutation_history, -1);
+					#print "extant_nt=$extant_nt\n";
+					
+					# Store nucleotide
+					$site_to_outgroups{$mutated_site}->{$extant_nt}++;
+					
+					foreach my $event (@mutation_history_events) { # these are ordered, but won't matter with new approach
+						
+						if ($event =~ /(\d+)\-\w\>\w/) {
+							#91404-A>G
+							#868627-G>A
+							
+							my $generation = $1;
+							
+							$site_to_outgroups{$mutated_site}->{history}->{$generation}->{$event}++;
+						}
 					}
+					
+				} else { # this taxon does NOT have the mutated site, add the ancestral (seed)
+					$site_to_outgroups{$mutated_site}->{$AA}++;
 				}
-#				
-			} else { # this taxon does NOT have the mutated site, add the ancestral (seed)
-				$site_to_alleles{$mutated_site}->{$AA}++;
+			
+			# INGROUP (or, if no outgroups, everything)
+			} else {
+			
+				if ($taxa_histories{$taxon}->{$mutated_site}) { # this taxon HAS the mutated site
+					
+					my $mutation_history = $taxa_histories{$taxon}->{$mutated_site};
+					#print "mutation_history=$mutation_history\n";
+					
+					my @mutation_history_events = split(/,/, $mutation_history);
+	
+					my $extant_nt = substr($mutation_history, -1);
+					#print "extant_nt=$extant_nt\n";
+					
+					# Store nucleotide
+					$site_to_alleles{$mutated_site}->{$extant_nt}++;
+					
+					foreach my $event (@mutation_history_events) { # these are ordered, but won't matter with new approach
+						
+						if ($event =~ /(\d+)\-\w\>\w/) {
+							#91404-A>G
+							#868627-G>A
+							
+							my $generation = $1;
+							
+							$site_to_alleles{$mutated_site}->{history}->{$generation}->{$event}++;
+						}
+					}
+					
+				} else { # this taxon does NOT have the mutated site, add the ancestral (seed)
+					$site_to_alleles{$mutated_site}->{$AA}++;
+				}
 			}
 		}
 	}
 	
 	
 	foreach my $taxon (sort {$a <=> $b} keys %taxa_histories) {
-		$num_taxa++; # COMEBACK -- will this capture ALL taxa in ALL situations? What if no history? I think yes.		
+		
+		# OUTGROUP(S), if any
+		if ($excluded_taxa_names{$taxon}) { # exclude outgroups
+			$num_outgroups++; # COMEBACK -- we don't appear to be using these anymore. Consider pitching.
+		
+		# INGROUP (all if no outgroups)
+		} else {
+			$num_taxa++; # COMEBACK -- will this capture ALL taxa in ALL situations? What if no history? I think yes.
+		}	
+			
 	} # end all taxa
 	
 	my $out_line = '';
@@ -561,15 +613,8 @@ if ($vcf_output =~ /\w+/) {
 		my $REF = '';
 		my $REF_count = 0;
 		my $arbitrary_REF = 0;
-#		my $running_total_nt = 0;
-#		my $running_total_variant_match_AA = 0;
 		
 		foreach my $nt (@nts) {
-#			my $this_nt_count = $site_to_alleles{$mutated_site}->{$nt};
-#			$running_total_nt += $this_nt_count;
-#			
-#			if ($nt eq $AA) {
-#				$running_total_variant_match_AA += $this_nt_count;
 			if ($site_to_alleles{$mutated_site}->{$nt} > $REF_count) {
 				$REF = $nt;
 				$REF_count = $site_to_alleles{$mutated_site}->{$nt};
@@ -591,7 +636,6 @@ if ($vcf_output =~ /\w+/) {
 			#print "nt=$nt\n";
 			
 			if ($site_to_alleles{$mutated_site}->{$nt} > 0) { # here, possible that back mutation eliminates variation
-				#print "AC_prelude=" . $site_to_alleles{$mutated_site}->{$nt} . "\n";
 				#print "nt=$nt\n";
 				push(@all_nts_present, $nt);
 				
@@ -635,23 +679,11 @@ if ($vcf_output =~ /\w+/) {
 		$out_line .= "$fasta_header\t$mutated_site\t.\t$REF\t$ALT\t100\tPASS\t";
 		$out_line .= "AC=$AC\;AF=$AF\;AN=$AN_NS_DP\;NS=$AN_NS_DP\;DP=$AN_NS_DP\;AA=$AA\;VT=SNP\;"; 
 		
-		# PROBLEM:
-		#HsGgAncestor_chr21_24000001_24100000	602	.	T	A	100	PASS	AC=2;AF=0.333333333333333;AN=6;NS=6;DP=6;AA=G;VT=SNP;MUTATIONS=G>T,G>A;GENERATIONS=214482,1006400;TAXA=4,2
-			#
-		
-		my $mutations;
-		my $generations;
-		my $taxa;
-		
-		# Sort the events in chronological order
-		#foreach my $event (%{$site_to_alleles{$mutated_site}->{history}}) {
-		
-		#print 'ordered_events=' . @{$site_to_alleles{$mutated_site}->{ordered_events}} . "\n";
-		#
-		#my $ordered_events_ref = $site_to_alleles{$mutated_site}->{ordered_events};
-		#my @ordered_events = @{$ordered_events_ref};
-		#
-		#for (my $event_index = 0; $event_index < @ordered_events; $event_index++) {
+		##################################################################################
+		# INGROUP (SNP) INFORMATION
+		my $mutations = '';
+		my $generations = '';
+		my $taxa = '';
 		
 		my $hits = 0;
 		my %prev_change;
@@ -673,10 +705,9 @@ if ($vcf_output =~ /\w+/) {
 					my $this_mutation = $2;
 					$mutations .= "$2\,";
 					$generations .= "$1\,";
-					#$taxa .= $site_to_alleles{$mutated_site}->{history}->{$event} . ',';
 					$taxa .= $event_num . ',';
 					
-					my @two_states = split(/,/, $this_mutation);
+					my @two_states = split(/>/, $this_mutation);
 					my $state1 = $two_states[0];
 					my $state2 = $two_states[1];
 					
@@ -702,13 +733,75 @@ if ($vcf_output =~ /\w+/) {
 		chop($generations);
 		chop($taxa);
 		
-		$out_line .= "MUTATIONS=$mutations\;GENERATIONS=$generations\;TAXA=$taxa\;";
+		if ($mutations ne '' || $generations ne '' || $taxa ne '') {
+			$out_line .= "MUTATIONS=$mutations\;GENERATIONS=$generations\;TAXA=$taxa\;";
+		}
 		
+		##################################################################################
+		# OUTGROUP (SUB) INFORMATION
+		my $mutations_out = '';
+		my $generations_out = '';
+		my $taxa_out = '';
+		
+		my $hits_out = 0;
+		my %prev_change_out;
+		my %prev_state_1_out;
+		my %prev_state_2_out;
+		my $back_mutation_out = 0;
+		my $recurrent_mutation_out = 0;
+		
+		foreach my $generation (sort {$a <=> $b} keys %{$site_to_outgroups{$mutated_site}->{history}}) {
+		
+			$hits_out++;
+			
+			# SHOULD ONLY BE ONE EVENT PER GENERATION
+			foreach my $event (%{$site_to_outgroups{$mutated_site}->{history}->{$generation}}) {
+				
+				my $event_num = $site_to_outgroups{$mutated_site}->{history}->{$generation}->{$event};
+				
+				if($event =~ /(\d+)\-([\>\w+]+)/) {
+					my $this_mutation = $2;
+					$mutations_out .= "$2\,";
+					$generations_out .= "$1\,";
+					$taxa_out .= $event_num . ',';
+					
+					my @two_states = split(/>/, $this_mutation);
+					my $state1 = $two_states[0];
+					my $state2 = $two_states[1];
+					
+					# Could be recurrent/parallel
+					if ($prev_change_out{$this_mutation}) {
+						$recurrent_mutation_out++;
+					}
+					
+					$prev_change_out{$this_mutation}++;
+					
+					# Could be back mutation
+					if ($prev_state_1_out{$state2}) {
+						$back_mutation_out++;
+					}
+					
+					$prev_state_1_out{$state1}++;
+					$prev_state_2_out{$state2}++;
+				}
+			}
+		}
+		
+		chop($mutations_out);
+		chop($generations_out);
+		chop($taxa_out);
+		
+		if ($mutations_out ne '' || $generations_out ne '' || $taxa_out ne '') {
+			$out_line .= "MUTATIONS_OUTGROUP=$mutations_out\;GENERATIONS_OUTGROUP=$generations_out\;TAXA_OUTGROUP=$taxa_out\;";
+		}
+		
+		
+		##################################################################################
+		# INGROUP (SNP) FLAGS
 		if ($arbitrary_REF == 1) {
 			$out_line .= "ARBITRARY_REF\;";
 		}
 		
-		#if ($multi_hit{$mutated_site} == 1) {
 		if ($hits > 1) {
 			$out_line .= "MULTIHIT\;";
 		}
@@ -717,12 +810,10 @@ if ($vcf_output =~ /\w+/) {
 			$out_line .= "MULTIALLELIC\;";
 		}
 		
-		#if ($back_mutation{$mutated_site} == 1) {
 		if ($back_mutation > 0) {
 			$out_line .= "BACK_MUTATION\;";
 		}
 		
-		#if ($recurrent_mutation{$mutated_site} == 1) {
 		if ($recurrent_mutation > 0) {
 			$out_line .= "RECURRENT_MUTATION\;";
 		}
