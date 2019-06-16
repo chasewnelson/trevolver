@@ -13,7 +13,7 @@ Recording rate matrix from ../EXAMPLE_INPUT/mutation_equal.txt...
 
 Analysis initiated at local time Fri Jun 14 00:45:41 2019
 
-COMMAND: trevolver.pl --tree=../EXAMPLE_INPUT/tree_7taxa.txt --seed_sequence=../EXAMPLE_INPUT/seed_sequence.fa --rate_matrix=../EXAMPLE_INPUT/mutation_equal.txt --branch_unit=144740 --random_seed=123456789 --tracked_motif=CG --track_mutations --vcf_output=example2_SNP_report.vcf --suppress_ancestral_seq --verbose
+COMMAND: trevolver.pl --tree=../EXAMPLE_INPUT/tree_7taxa.txt --seed_sequence=../EXAMPLE_INPUT/seed_sequence.fa --rate_matrix=../EXAMPLE_INPUT/mutation_equal.txt --branch_unit=144740 --random_seed=123456789 --tracked_motif=CG --track_mutations --vcf_output=SNP_report_example2.vcf --suppress_ancestral_seq --verbose
 
 RANDOM SEED: 123456789
 

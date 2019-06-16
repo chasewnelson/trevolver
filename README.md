@@ -2,10 +2,18 @@
 
 **Trevolver** is a Perl program for simulating non-reversible DNA sequence evolution on a fixed bifurcating tree using trinucleotide context. It relies on no external dependencies, facilitating maximum portability. Just download and run.
 
-To test the simulation with the example data, execute the following at the Unix command line or Mac Terminal:
+To test the simulation with the example data, execute the program at the Unix command line or Mac Terminal as follows:
+
+### FORMAT:
+
+	trevolver.pl --tree=<newick>.txt --seed_sequence=<seed>.fa \
+	--rate_matrix=<64x4>.txt  --branch_unit=<#> --track_mutations \
+	--tracked_motif=<ACGT> --verbose > <output_name>.txt
+
+### EXAMPLE 1:
 
 	trevolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa \
-	--rate_matrix=mutation_CpGx20.txt --branch_unit=144740 > example1_output.txt
+	--rate_matrix=mutation_CpGx20.txt --branch_unit=144740 > output_example1.txt
 
 Find more [examples](#examples) below.
 
@@ -62,27 +70,21 @@ Call **Trevolver** using the following options:
 
 ## <a name="examples"></a>EXAMPLES
 
-Example input and output are available in the `EXAMPLE_INPUT` and `EXAMPLE_OUTPUT` directories at this GitHub page, where reproducible examples are numbered (*e.g.*, **example1_output.txt**). When the random seed has not been specified, exact results can be reproduced by using the same random number seed reported in the example output.
-
-### FORMAT:
-
-	trevolver.pl --tree=<newick>.txt --seed_sequence=<seed>.fa \
-	--rate_matrix=<64x4>.txt  --branch_unit=<#> --track_mutations \
-	--tracked_motif=<ACGT> --verbose > output.txt
+Example input and output are available in the `EXAMPLE_INPUT` and `EXAMPLE_OUTPUT` directories at this GitHub page, where reproducible examples are numbered (*e.g.*, **output_example1.txt**). When the random seed has not been specified, exact results can be reproduced by using the same random number seed reported in the example output.
 	
 ### ALL OPTIONS USED:
 
 	trevolver.pl --tree=tree_7taxa.txt \
 	--seed_sequence=seed_sequence.fa --rate_matrix=mutation_equal.txt \
 	--branch_unit=144740 --random_seed=123456789 --tracked_motif=CG \
-	--track_mutations --vcf_output=example2_SNP_report.vcf \
-	--suppress_ancestral_seq --verbose > example2_output.txt
+	--track_mutations --vcf_output=SNP_report_example2.vcf \
+	--suppress_ancestral_seq --verbose > output_example2.txt
 	
 ### TYPICAL USAGE (program decides random seed; not verbose):
 
 	trevolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa \
 	--rate_matrix=mutation_CpGx20.txt --branch_unit=144740 --track_mutations \
-	--tracked_motif=CG --vcf_output=example3_SNP_report.vcf > example3_output.txt
+	--tracked_motif=CG --vcf_output=example3_SNP_report.vcf > output_example3.txt
 
 ### MINIMUM OPTIONS, WITH OUTPUT TO SCREEN:
 
@@ -120,7 +122,7 @@ If you have questions about **Trevolver**, please click on the <a target="_blank
 * **Simulating a single sequence.** It is entirely possible to simulate the evolution of a single sequence. Simply provide a tree with only one taxon and branch length. For example, to simulate the evolution of a single sequence named "my_creature" for 1 million generations, the tree file would contain, simply, `(my_creature:1000000);`. Provide a scaling factor (`--branch_unit`) of 1, and you're good to go:
 
 		trevolver.pl --tree=tree_1taxon.txt --seed_sequence=seed_sequence.fa \
-		--rate_matrix=mutation_equal.txt --branch_unit=1 > example4_output.txt
+		--rate_matrix=mutation_equal.txt --branch_unit=1 > output_example4.txt
 
 ## <a name="acknowledgments"></a>Acknowledgments
 **Trevolver** was written with support from a Gerstner Scholars Fellowship from the Gerstner Family Foundation at the American Museum of Natural History to C.W.N. (2016-2019), and is maintained with support from the same. The logo image was designed by Mitch Lin (2019); copyright-free DNA helix obtained from Pixabay. Thanks to Reed A. Cartwright, Michael Dean, Dan Graur, Ming-Hsueh Lin, Lisa Mirabello, Michael Tessler, and Meredith Yeager for discussion.

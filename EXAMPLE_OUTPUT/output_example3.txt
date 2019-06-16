@@ -6,7 +6,7 @@
 
 Analysis initiated at local time Fri Jun 14 00:55:56 2019
 
-COMMAND: trevolver.pl --tree=../EXAMPLE_INPUT/tree_6taxa.txt --seed_sequence=../EXAMPLE_INPUT/seed_sequence.fa --rate_matrix=../EXAMPLE_INPUT/mutation_CpGx20.txt --branch_unit=144740 --track_mutations --tracked_motif=CG --vcf_output=example3_SNP_report.vcf
+COMMAND: trevolver.pl --tree=../EXAMPLE_INPUT/tree_6taxa.txt --seed_sequence=../EXAMPLE_INPUT/seed_sequence.fa --rate_matrix=../EXAMPLE_INPUT/mutation_CpGx20.txt --branch_unit=144740 --track_mutations --tracked_motif=CG --vcf_output=SNP_report_example3.vcf
 
 RANDOM SEED: 2802772389
 
