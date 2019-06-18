@@ -10,12 +10,7 @@ To test the simulation with the example data, execute the program at the Unix co
 	--rate_matrix=<64x4>.txt  --branch_unit=<#> --track_mutations \
 	--tracked_motif=<ACGT> --verbose > <output_name>.txt
 
-### EXAMPLE 1:
-
-	trevolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa \
-	--rate_matrix=mutation_CpGx20.txt --branch_unit=144740 > output_example1.txt
-
-Find more [examples](#examples) below.
+Find some real [examples](#examples) below.
 
 ## <a name="contents"></a>Contents
 
@@ -51,7 +46,7 @@ Happy Trevolving!
 
 Call **Trevolver** using the following options:
 
-* `--tree` (**REQUIRED**): file containing a bifurcating evolutionary tree in newick format with branch lengths. NO NODE NAMES OR SUPPORT VALUES AT THIS TIME. Only the first encountered tree is used, *i.e.*, embarassingly parallel analyses must be executed one level up.
+* `--tree` (**REQUIRED**): file containing a bifurcating evolutionary tree in newick format with branch lengths. **NO NODE NAMES OR SUPPORT VALUES AT THIS TIME**. Only the first encountered tree is used, *i.e.*, embarassingly parallel analyses must be executed one level up.
 * `--seed_sequence` (**REQUIRED**): FASTA file containing starting (seed) sequence at tree root, to be evolved. Only the first sequence encountered is used.
 * `--rate_matrix` (**REQUIRED**): file containing 64 × 4 tab-delimited trinucleotide rate matrix where rows and columns are in alphabetical order. For example, values in the first row correspond to AAA➞AAA, AAA➞ACA, AAA➞AGA, and AAA➞ATA.
 * `--branch_unit` (**REQUIRED**): a scaling factor, equal to 2*N*<sub>0</sub> or 4*N*<sub>0</sub> in most coalescent simulations (*e.g.*, <a target="_blank" href="https://home.uchicago.edu/rhudson1/source/mksamples.html">**ms**</a>; Hudson 2002), which can be multiplied by a branch length to obtain the length of the lineage in generations. Branch lengths will be multiplied by this value and rounded up to the nearest integer to determine number of generations. For example, given the value 144740, a branch length of 0.228826612 in the phylogenetic tree would correspond to 144740 × 0.228826612 = 33,120.364 generations.
@@ -62,31 +57,53 @@ Call **Trevolver** using the following options:
 * `--tracked_motif` (*OPTIONAL*): a motif to track after each mutation. For example, to report the number of CpG sites over the course of a run, specify CG like so: `--tracked_motif=CG`.
 * `--track_mutations` (*OPTIONAL*): reports the mutation rate and count over time.
 * `--excluded_taxa` (*OPTIONAL*): path of **file containing a list of taxa names** (comma-separated) to be treated as outgroups, *i.e.*, excluded from the VCF file and the consensus sequence(s). This might be desirable if a small number of taxa represent outgroups, to which polymorphism in an ingroup is being compared.
-* `--excluded_outgroups` (*OPTIONAL*) [**NOT YET SUPPORTED!**]: **number of outgroups** to be excluded for calculation of variant frequencies in the VCF file. Using this option, outgroups are currently considered to be terminal taxa (external branches) if they have the longest branch lengths. For example, if `--excluded_outgroups=2` is specified, the two extant taxa with the longest branches will be excluded.
-* `--vcf_output` (*OPTIONAL*): name of a [VCF format output file](#vcf-output) to be generated in the working directory, unless a full path name is given.
-* `--print_consensus` (*OPTIONAL*) [**NOT YET SUPPORTED!**]: prints the consensus sequence (containing the `REF` allele, here defined as the major allele, at each site) in a separate output file.
-* `--suppress_ancestral_seq` (*OPTIONAL*): suppress printing the ancestral (seed) sequence in the output. This might be desirable if the seed sequence is very large and its inclusion in the output consumes too much disk space.
-* `--verbose` (*OPTIONAL*): tell Trevolver to tell you EVERYTHING that happens. Not recommended except for development and debugging purposes.
+* `--outgroups` (*OPTIONAL*): **number of outgroups** to be excluded for identification of the ingroup most recent common ancestor (MRCA) and for calculation of ingroup variant frequencies in the VCF file. Outgroups are considered to be the most deeply-branching terminal taxa (external nodes). For example, if `--outgroups=2` is specified, the fixed tree is navigated starting at the root. At each internal node, the branch containing the fewest terminal taxa is considered to contain the outgroup(s). Once the user-specified number of outgroups is identified, the most recent common ancestor (MRCA) node of the remaining (ingroup) taxa is identified and reported. If a set of non-arbitrary outgroup taxa does not exist for the user-specified number (*e.g.*, if `--outgroups=2` is called, but the two deepest splits contain three rather than two taxa), a warning is printed and no outgroups are used.
+* `--vcf_output` (*OPTIONAL*): name of a [VCF format output file](#vcf-output) to be generated in the working directory, unless a full path name is given. If not specified, a file will be printed in the working directory with a `.vcf` extension using the name of the tree file as a prefix.
+* `--suppress_seed_seq` (*OPTIONAL*): suppress printing the ancestral (seed) sequence in the output. This might be desirable if the seed sequence is very large and its inclusion in the output consumes too much disk space.
+* `--suppress_MRCA_seq` (*OPTIONAL*): prevents the MRCA (ingroup most recent common ancestor) sequence from being printed.
+* `--suppress_consensus_seq` (*OPTIONAL*): prevents the consensus sequence (containing the `REF` allele, here defined as the major allele, at each site) from being printed.
+* `--verbose` (*OPTIONAL*): tell Trevolver to report EVERYTHING that happens. Not recommended except for development and debugging purposes.
 
 ## <a name="examples"></a>EXAMPLES
 
-Example input and output are available in the `EXAMPLE_INPUT` and `EXAMPLE_OUTPUT` directories at this GitHub page, where reproducible examples are numbered (*e.g.*, **output_example1.txt**). When the random seed has not been specified, exact results can be reproduced by using the same random number seed reported in the example output.
-	
-### ALL OPTIONS USED:
+Example input and output files are available in the `EXAMPLE_INPUT` and `EXAMPLE_OUTPUT` directories at this GitHub page, where reproducible examples are numbered (*e.g.*, **output_example1.txt**). When the random seed has not been specified, exact results can be reproduced by using the same random number seed reported in the output file present in `EXAMPLE_OUTPUT`. Note that, if your input file(s) (*e.g.*, **tree\_6taxa.txt**) are not in the working directory (*i.e.*, where your Terminal is currently operating), you will need to specify the full path of the file name (*e.g.*, **/Users/chasely/Desktop/trevolver\_practice/tree\_6taxa.txt**). Also note that, in the examples below, a `\` is used simply to continue the previous command on the line.
 
-	trevolver.pl --tree=tree_7taxa.txt \
-	--seed_sequence=seed_sequence.fa --rate_matrix=mutation_equal.txt \
-	--branch_unit=144740 --random_seed=123456789 --tracked_motif=CG \
-	--track_mutations --vcf_output=SNP_report_example2.vcf \
-	--suppress_ancestral_seq --verbose > output_example2.txt
+### EXAMPLE 1: A SIMPLE SIMULATION
+
+	trevolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa \
+	--rate_matrix=mutation_CpGx20.txt --vcf_output=example1.vcf --branch_unit=10000 \
+	> example1.txt
 	
-### TYPICAL USAGE (program decides random seed; not verbose):
+### EXAMPLE 2: MANY OPTIONS USED
+
+	trevolver.pl --tree=tree_7taxa.txt --seed_sequence=seed_sequence.fa \
+	--rate_matrix=mutation_equal.txt --branch_unit=144740 --random_seed=123456789 \
+	--tracked_motif=CG --track_mutations --vcf_output=example2.vcf --outgroups=2 \
+	--suppress_seed_seq --suppress_consensus_seq --verbose > example2.txt
+	
+### EXAMPLE 3: TYPICAL USAGE (program decides random seed; not verbose)
 
 	trevolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa \
 	--rate_matrix=mutation_CpGx20.txt --branch_unit=144740 --track_mutations \
-	--tracked_motif=CG --vcf_output=example3_SNP_report.vcf > output_example3.txt
+	--tracked_motif=CG --vcf_output=example3.vcf > example3.txt
 
-### MINIMUM OPTIONS, WITH OUTPUT TO SCREEN:
+### EXAMPLE 4: SIMULATION WITH TWO OUTGROUPS
+
+	trevolver.pl --tree=tree_10taxa.txt --seed_sequence=seed_sequence.fa \
+	--rate_matrix=mutation_CpGx20.txt --branch_unit=144740 --track_mutations \
+	--tracked_motif=CG --vcf_output=example4.vcf --outgroups=2 > example4.txt
+
+### <a name="example-5"></a>EXAMPLE 5: EVOLVE A SINGLE SEQUENCE FOR 1 MILLION GENERATIONS
+
+See explanation in [Troubleshooting](#troubleshooting).
+
+	trevolver.pl --tree=tree_1taxon.txt --seed_sequence=seed_sequence.fa \
+	--rate_matrix=mutation_equal.txt --vcf_output=example5.vcf --branch_unit=1 \
+	> example5.txt
+
+### EXAMPLE 6: MINIMUM OPTIONS WITH OUTPUT TO SCREEN
+
+This will automatically generate a VCF file named **tree\_7taxa\_trevolver.vcf** in the working directory.
 
 	trevolver.pl --tree=tree_7taxa.txt --seed_sequence=seed_sequence.fa \
 	--rate_matrix=mutation_CpGx20.txt --branch_unit=1447
@@ -97,35 +114,54 @@ Depending on the options specified, **Trevolver** will output data immediately f
 
 ### <a name="standard-output"></a>Standard Output
 
+The beginning of the output will report:
+
+* `COMMAND`: how Trevolver was called.
+* `RANDOM_SEED`: the random seed used.
+* `SEED_SEQUENCE`: the nucleotide sequence used to seed the simulation.
+* `TREE`: the fixed tree on which the simulation took place.
+* `MRCA_GENERATION`: the generation (from time 0 at the root) in which the most recent common ancestor (MRCA) of the ingroup lived.
+* `MRCA_SUBTREE`: the subtree for which the MRCA is the root.
+* `OUTGROUPS`: names of the outgroups, if applicable.
+* `MRCA_NODE_ID`: node ID of the MRCA.
+* `MRCA_SEQUENCE`: nucleotide sequence of the MRCA.
+* `VCF_OUTPUT_FILE`: file name of the VCF output.
+* `CONSENSUS_SEQUENCE`: consensus nucleotide sequence of the ingroup at the end of the simulation (*i.e.*, tree tips).
+
+Additionally, following a brief **SUMMARY OF RESULTS**, the following flags indicate separate sections of more detailed output:
+
 * `//MUTATION`: the following lines contain a full mutation history with three columns: taxon, site, and mutation. The mutation column data is in the format `[generation]-[ancestral allele]>[derived allele]`. For example, a C>T mutation which occurred in generation 1,988 would be listed as `1988-C>T`.
 * `//TRACKED`: the following lines contain tracked mutation rates and/or motif data with five columns: lineage, generation, mutation\_rate, mutation\_count, and motif\_count.
-* `//VCF`: the following lines contain any output pertinent to the separate <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) file specified by the user, which contains a SNP report for taxon/leaf (terminal) nodes. More options will be available soon.
 
 ### <a name="vcf-output"></a>VCF Output
 
-The <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) output conforms to format VCFv4.1, such as used by the 1000 Genomes Project GRCh38/hg38 release, with some notable exceptions. The `REF` (reference) allele is defined as the consensus (major) allele, which may or may not match the `AA` (ancestral allele). A consensus sequence is printed in a separate file for convenience (`--print_consensus`). First, additional metadata headers (lines beginning with `##`) are used to indicate arguments used as **Trevolver** input, for convenience and reproducibility. Headers that are irrelevant (*e.g.*, non-single nucleotide variant descriptors) have been removed. Additionally, six data types have been added to the `INFO` column:
+The <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) output conforms to format VCFv4.1, such as used by the 1000 Genomes Project GRCh38/hg38 release, with some notable exceptions. The `REF` (reference) allele is defined as the consensus (major) allele, which may or may not match the `AA` (ancestral allele). A consensus sequence is printed for convenience (unless `--suppress_consensus` is called). First, additional metadata headers (lines beginning with `##`) are used to indicate arguments used as **Trevolver** input, for convenience and reproducibility. Headers that are irrelevant (*e.g.*, non-single nucleotide variant descriptors) have been removed. Additionally, six data types have been added to the `INFO` column:
 
-* `MUTATIONS`: all unique mutations that have occurred at this site, *e.g.*, `G>A`. Multiple mutations are comma-separated (*e.g.*, `G>A,A>G`) in **chronological order**, for convenience in downstream analyses. If outgroups or excluded taxa are specified, `MUTATIONS` refers to only the ingroup, while `MUTATIONS_OUTGROUP` refers to only the outgroup(s).
-* `GENERATIONS`: time (generation) at which the unique mutation(s) occurred, comma-separated in the same order (**chronological**). If outgroups or excluded taxa are specified, `GENERATIONS ` refers to only the ingroup, while `GENERATIONS_OUTGROUP` refers to only the outgroup(s).
-* `TAXA`: number of taxa which share the unique mutation(s), comma-separated in the same order (**chronological**). If outgroups or excluded taxa are specified, `TAXA` refers to only the ingroup, while `TAXA_OUTGROUP` refers to only the outgroup(s).
+* `MUTATIONS`/`MUTATIONS_OG`: all unique mutations that have occurred at this site, *e.g.*, `G>A`. Multiple mutations are comma-separated (*e.g.*, `G>A,A>G`) in **chronological order**, for convenience in downstream analyses. If outgroups or excluded taxa are specified, `MUTATIONS` refers to only the ingroup, while `MUTATIONS_OG` refers to only the outgroup(s).
+* `GENERATIONS`/`GENERATIONS_OG`: time (generation) at which the unique mutation(s) occurred, comma-separated in the same order (**chronological**). If outgroups or excluded taxa are specified, `GENERATIONS ` refers to only the ingroup, while `GENERATIONS_OG` refers to only the outgroup(s).
+* `TAXA`/`TAXA_OG`: number of taxa which share the unique mutation(s), comma-separated in the same order (**chronological**). If outgroups or excluded taxa are specified, `TAXA` refers to only the ingroup, while `TAXA_OG` refers to only the outgroup(s).
 * `ARBITRARY_REF`: flag indicating there was a tie for the major/consensus/most common allele at this site. If the highest allele frequency is shared by two alleles, the one that comes first alphabetically is reported.
-* `MULTIHIT`: flag indicating a site has experienced more than one mutation, in either the same or a distinct lineage.
-* `MULTIALLELIC`: flag indicating a site has multiple minor (non-reference) alleles (*i.e.*, >2 alleles). All multiallelic sites are multihit, but the reverse is not true.
-* `BACK_MUTATION`: flag indicating a site has experience back mutation, returning to a previous state/allele. All sites with back mutation have experienced multiple hits, but the reverse is not true.
-* `INVARIANT_ANCESTRAL`: flag indicating a site has no polymorphism in the extant taxa (leaves), and that the fixed state matches the ancestral allele (AA). This implies a mutation has occurred in the history of the site, but that the derived allele was lost via back mutation.
-* `INVARIANT_DERIVED`: flag indicating a site has no polymorphism in the extant taxa (leaves), and that the fixed state matches a derived allele that resulted from mutation. This implies a mutation occurred at least once in the history of the site, and that all extant sequences are descended from a mutated ancestor.
+* `MULTIHIT`/`MULTIH_OG`: flags indicating a site has experienced more than one mutation, in either the same or a distinct lineage, in the ingroup/outgroup(s).
+* `MULTIALLELIC`/`MULTIA_OG`: flags indicating a site has multiple minor (non-reference) alleles (*i.e.*, >2 alleles) in the ingroup/outgroup(s). All multiallelic sites are multihit, but the reverse is not true.
+* `BACK_MUTATION`/`BACK_M_OG`: flag indicating a site has experienced back mutation, returning to a previous state/allele, in the ingroup/outgroup(s). All sites with back mutation have experienced multiple hits, but the reverse is not true.
+* `RECURRENT_MUTATION`/`RECURRENT_M_OG`: flag indicating a site has experienced recurrent mutation, i.e., the same change occurring multiple times independently, in the ingroup/outgroup(s).
+* `INVARIANT_ANCESTRAL`: flag indicating a site has no polymorphism in the ingroup leaves (extant taxa), and that the fixed state matches the ancestral allele (AA). Thus, even if a mutation occurred in the history of the site, the derived allele was lost via back mutation.
+* `INVARIANT_DERIVED`: flag indicating a site has no polymorphism in the ingroup leaves (extant taxa), and that the fixed state matches a derived allele that resulted from mutation. This implies that all extant ingroup sequences are descended from a mutated ancestor.
+* `NO_ANCESTRAL`: flag indicating that no ancestral (seed) alleles remain in the extant individuals of the ingroup. Note that this is compatible with the presence of polymorphism, so long as none of the alleles match the ancestral allele.
+* `ALLELES_OG`: comma-separated list of all alleles present in the outgroup(s).
+* `ALLELE_COUNTS_OG`: comma-separated listed of all allele counts for alleles present in the outgroup(s), in the same order as `ALLELES_OG`.
+* `OG_FIXED`: flag indicating a site is fixed for one allele (*i.e.*, has no variation) in the outgroup(s). This will be true by definition if there is only only outgroup. Note that frequences of outgroup alleles can be retrieved from the `ALLELE_COUNTS_OG` data.
+* `OG_DIVERGED`: flag indicating one or more outgroup alleles *differs from* one or more ingroup alleles. The outgroups may be diverged from the ingroup but not fixed.
+* `OG_SHARE`: flag indicating one or more outgroup alleles *matches* one or more ingroup alleles. The outgroups may share alleles with the ingroup but not be fixed.
 
 ## <a name="troubleshooting"></a>Troubleshooting
 
 If you have questions about **Trevolver**, please click on the <a target="_blank" href="https://github.com/chasewnelson/trevolver/issues">Issues</a> tab at the top of this page and begin a new thread, so that others might benefit from the discussion.
 
-* **Simulating a single sequence.** It is entirely possible to simulate the evolution of a single sequence. Simply provide a tree with only one taxon and branch length. For example, to simulate the evolution of a single sequence named "my_creature" for 1 million generations, the tree file would contain, simply, `(my_creature:1000000);`. Provide a scaling factor (`--branch_unit`) of 1, and you're good to go:
-
-		trevolver.pl --tree=tree_1taxon.txt --seed_sequence=seed_sequence.fa \
-		--rate_matrix=mutation_equal.txt --branch_unit=1 > output_example4.txt
+* **Simulating a single sequence.** It is entirely possible to simulate the evolution of a single sequence. Simply provide a tree with only one taxon and branch length. For example, to simulate the evolution of a single sequence named "my_creature" for 1 million generations, the tree file would contain, simply, `(my_creature:1000000);`. Provide a scaling factor (`--branch_unit`) of 1, and you're good to go: see [EXAMPLE 5](#example-5).
 
 ## <a name="acknowledgments"></a>Acknowledgments
-**Trevolver** was written with support from a Gerstner Scholars Fellowship from the Gerstner Family Foundation at the American Museum of Natural History to C.W.N. (2016-2019), and is maintained with support from the same. The logo image was designed by Mitch Lin (2019); copyright-free DNA helix obtained from Pixabay. Thanks to Reed A. Cartwright, Michael Dean, Dan Graur, Ming-Hsueh Lin, Lisa Mirabello, Michael Tessler, and Meredith Yeager for discussion.
+**Trevolver** was written with support from a Gerstner Scholars Fellowship from the Gerstner Family Foundation at the American Museum of Natural History to C.W.N. (2016-2019), and is maintained with support from the same. The logo image was designed by Mitch Lin (2019); copyright-free DNA helix obtained from Pixabay. Thanks to Reed A. Cartwright, Michael Dean, Dan Graur, Ming-Hsueh Lin, Lisa Mirabello, Sergios Orestis-Kolokotronis, Michael Tessler, and Meredith Yeager for discussion.
 
 ## <a name="citation"></a>Citation
 
