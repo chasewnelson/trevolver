@@ -9,11 +9,11 @@
 #########################################################################################
 # EXAMPLES
 #########################################################################################
-# [FORMAT] trevolver.pl --tree=<treefile>.newick --seed_sequence=<sequence>.fasta --rate_matrix=<k x 4 table>.txt --branch_unit=<4N0 integer> --random_seed=<optional integer>
+# [FORMAT] trevolver.pl --tree=<newick>.txt --seed_sequence=<seed>.fasta --rate_matrix=<64x4>.txt --branch_unit=<#> --random_seed=<#>
 #########################################################################################
 # [EXAMPLE 1] trevolver.pl --tree=../EXAMPLE_INPUT/tree_6taxa.txt --seed_sequence=../EXAMPLE_INPUT/seed_sequence.fa --rate_matrix=../EXAMPLE_INPUT/mutation_CpGx20.txt --vcf_output=example1.vcf --branch_unit=10000 > example1.txt
 #########################################################################################
-# [EXAMPLE 2] trevolver.pl --tree=../EXAMPLE_INPUT/tree_7taxa.txt --seed_sequence=../EXAMPLE_INPUT/seed_sequence.fa --rate_matrix=../EXAMPLE_INPUT/mutation_equal.txt --branch_unit=144740 --random_seed=123456789 --tracked_motif=CG --track_mutations --vcf_output=example2.vcf --outgroups=2 --suppress_seed_seq --suppress_consensus_seq --verbose > example2.txt
+# [EXAMPLE 2] trevolver.pl --tree=../EXAMPLE_INPUT/tree_6taxa.txt --seed_sequence=../EXAMPLE_INPUT/seed_sequence.fa --rate_matrix=../EXAMPLE_INPUT/mutation_CpGx20.txt --vcf_output=example2.vcf --branch_unit=10000 --burn_in=1000 > example2.txt
 #########################################################################################
 # [EXAMPLE 3] trevolver.pl --tree=../EXAMPLE_INPUT/tree_6taxa.txt --seed_sequence=../EXAMPLE_INPUT/seed_sequence.fa --rate_matrix=../EXAMPLE_INPUT/mutation_CpGx20.txt --branch_unit=144740 --track_mutations --tracked_motif=CG --vcf_output=example3.vcf > example3.txt
 #########################################################################################
@@ -21,7 +21,9 @@
 #########################################################################################
 # [EXAMPLE 5] trevolver.pl --tree=../EXAMPLE_INPUT/tree_1taxon.txt --seed_sequence=../EXAMPLE_INPUT/seed_sequence.fa --rate_matrix=../EXAMPLE_INPUT/mutation_equal.txt --vcf_output=example5.vcf --branch_unit=1 > example5.txt
 #########################################################################################
-# [EXAMPLE 6] trevolver.pl --tree=../EXAMPLE_INPUT/tree_7taxa.txt --seed_sequence=../EXAMPLE_INPUT/seed_sequence.fa --rate_matrix=../EXAMPLE_INPUT/mutation_CpGx20.txt --branch_unit=1447
+# [EXAMPLE 6] trevolver.pl --tree=../EXAMPLE_INPUT/tree_7taxa.txt --seed_sequence=../EXAMPLE_INPUT/seed_sequence.fa --rate_matrix=../EXAMPLE_INPUT/mutation_equal.txt --branch_unit=144740 --random_seed=123456789 --tracked_motif=CG --track_mutations --vcf_output=example6.vcf --outgroups=2 --burn_in=500 --suppress_seed_seq --suppress_consensus_seq --verbose > example6.txt
+#########################################################################################
+# [EXAMPLE 7] trevolver.pl --tree=../EXAMPLE_INPUT/tree_7taxa.txt --seed_sequence=../EXAMPLE_INPUT/seed_sequence.fa --rate_matrix=../EXAMPLE_INPUT/mutation_CpGx20.txt --branch_unit=1447
 #########################################################################################
 
 
@@ -61,6 +63,8 @@ my $track_mutations;
 my $vcf_output;
 my $excluded_taxa;
 my $outgroups;
+my $burn_in;
+my $suppress_input_seq;
 my $suppress_seed_seq;
 my $suppress_MRCA_seq;
 my $suppress_consensus_seq;
@@ -77,6 +81,8 @@ GetOptions( "tree=s" => \$tree,
 			"vcf_output=s" => \$vcf_output,
 			"excluded_taxa=s" => \$excluded_taxa,
 			"outgroups=i" => \$outgroups,
+			"burn_in=i" => \$burn_in,
+			"suppress_input_seq" => \$suppress_input_seq,
 			"suppress_seed_seq" => \$suppress_seed_seq,
 			"suppress_MRCA_seq" => \$suppress_MRCA_seq,
 			"suppress_consensus_seq" => \$suppress_consensus_seq,
@@ -374,18 +380,6 @@ if ($verbose) {
 
 #my %tree;
 
-my $num_mutations = 0;
-my $total_branch_length = 0;
-my $branch_to_tip_length = 0;
-my %taxa_histories;
-my %generational_histories;
-my $node_id = 1;
-my %mutated_sites;
-
-unless($suppress_seed_seq) {
-	print "\nSEED_SEQUENCE: $seed_seq\n";
-}
-
 print "\nTREE: $tree\n";
 
 
@@ -395,7 +389,7 @@ print "\nTREE: $tree\n";
 my @outgroup_data; # [0] generation MRCA [1-n] outgroup names
 # Obtain OUTGROUP NAMES and the GENERATION in which the MRCA of the ingroup lived.
 if ($outgroups) {
-	if ($verbose) { print "\n###OUTGROUP IDENTIFICATION COMMENCING...\n" }
+	if ($verbose) { print "\n### OUTGROUP IDENTIFICATION COMMENCING...\n" }
 	
 	# PASS: tree, generations elapsed, curr_outgroup_count, outgroup_names
 	@outgroup_data = determine_outgroup_data($tree, 0, 0, ''); 
@@ -426,13 +420,41 @@ if ($outgroups) {
 
 
 ##########################################################################################
-# THE SIMULATION: recursive evolution approach using the subroutine evolve_two_subtrees()
+# BURN-IN
 ##########################################################################################
+my $num_burn_in_mutations = 0;
+my $input_seq = '';
+if ($burn_in) {
+	$input_seq = $seed_seq;
+	$seed_seq = burn_in($seed_seq, $burn_in);
+	if ($verbose) { print "BURN-IN INVOLVED $num_burn_in_mutations MUTATIONS\n" }
+}
+
+if ($input_seq ne '') {
+	unless($suppress_input_seq) { print "\nINPT_SEQUENCE: $input_seq\n" }
+}
+
+unless($suppress_seed_seq) { print "\nSEED_SEQUENCE: $seed_seq\n" }
+##########################################################################################
+##########################################################################################
+
+
+##########################################################################################
+# THE SIMULATION: recursive evolution approach using the subroutine evolve_branch()
+##########################################################################################
+my $num_mutations = 0;
+my $total_branch_length = 0;
+my $root_to_tip_length = 0;
+my %taxa_histories;
+my %generational_histories;
+my $node_id = 1;
+my %mutated_sites;
+
 my %MRCA_mutation_history;
 my $MRCA_seq;
 my $MRCA_node_id;
 if ($verbose) { print "\n###EVOLUTION ON TREE COMMENCING...\n" }
-evolve_two_subtrees($tree, 0, 0, 'n1=root,');
+evolve_branch($tree, 0, 0, 'n1=root,');
 ##########################################################################################
 ##########################################################################################
 
@@ -440,9 +462,7 @@ evolve_two_subtrees($tree, 0, 0, 'n1=root,');
 if ($outgroups) {
 	print "\nMRCA_NODE_ID: $MRCA_node_id\n";
 	
-	unless($suppress_MRCA_seq) {
-		print "\nMRCA_SEQUENCE: $MRCA_seq\n";
-	}
+	unless($suppress_MRCA_seq) { print "\nMRCA_SEQUENCE: $MRCA_seq\n" }
 }
 
 
@@ -588,49 +608,63 @@ if ($vcf_output =~ /\w+/) {
 		substr($consensus_seq, $mutated_site - 1, 1, $REF);
 	}
 	
-	unless($suppress_consensus_seq) {
-		print "\nCONSENSUS_SEQUENCE: $consensus_seq\n";
-	}
+	unless($suppress_consensus_seq) { print "\nCONS_SEQUENCE: $consensus_seq\n" }
 	
 	######################################################################################
 	# INITIATE VCF FILE
+	my $header_VCF = '';
+	
 	open(OUT_TREVOLVER_VCF, ">>$vcf_output");
-	print OUT_TREVOLVER_VCF "##fileformat=VCFv4.1\n" . 
+	$header_VCF .= "##fileformat=VCFv4.1\n" . 
 		"##FILTER=<ID=PASS,Description=\"All filters passed\">\n" .
 		"##fileDate=$today\n" . 
 		"##reference=https://github.com/chasewnelson/trevolver\n" . 
 		"##source=<TREVOLVER,Description=\"trevolver.pl @commands\">\n" . 
-		"##tree=$tree\n" . 
+		"##tree=$tree\;\n" . 
 		"##seed_sequence_file=$seed_sequence\n";
+	
+	if ($input_seq ne '') {
+		unless($suppress_input_seq) {
+			$header_VCF .= "##inpt_sequence=$input_seq\n";
+		}
+	}
 		
 	unless($suppress_seed_seq) {
-		print OUT_TREVOLVER_VCF "##seed_sequence=$seed_seq\n";
+		$header_VCF .= "##seed_sequence=$seed_seq\n";
 	}
 
 	unless($suppress_consensus_seq) {
-		print OUT_TREVOLVER_VCF "##cons_sequence=$consensus_seq\n";
+		$header_VCF .= "##cons_sequence=$consensus_seq\n";
 	}
 	
 	if ($outgroups) {
 		unless($suppress_MRCA_seq) {
-			print OUT_TREVOLVER_VCF "##MRCA_sequence=$MRCA_seq\n";
+			$header_VCF .= "##MRCA_sequence=$MRCA_seq\n";
 		}
 		
-		print OUT_TREVOLVER_VCF "##MRCA_generation=$MRCA_generation\n" .
+		$header_VCF .= "##MRCA_generation=$MRCA_generation\n" .
 			"##MRCA_node_id=$MRCA_node_id\n" . 
 			"##MRCA_subtree=$MRCA_subtree\n";
 	}
 	
-	print OUT_TREVOLVER_VCF "##rate_matrix=$rate_matrix\n" . 
+	$header_VCF .= "##rate_matrix=$rate_matrix\n" . 
 		"##branch_unit=$branch_unit\n" . 
 		"##random_seed=$random_seed\n";
 	
 	if ($tracked_motif) {
-		print OUT_TREVOLVER_VCF "##tracked_motif=$tracked_motif\n";
+		$header_VCF .= "##tracked_motif=$tracked_motif\n";
 	}
 	
+	if ($burn_in) {
+		$header_VCF .= "##burn_in_length=$burn_in\n";
+		$header_VCF .= "##burn_in_mutations=$num_burn_in_mutations\n";
+	}
 	
-	print OUT_TREVOLVER_VCF "##contig=<ID=$file_prefix,assembly=1,length=$seed_seq_length>\n" . 
+	$header_VCF .= "##total_mutations=$num_mutations\n" . 
+		"##tree_length=$total_branch_length\n" . 
+		"##experiment_length=$root_to_tip_length\n" . 
+		"##simulation_time=" . (time - $time1) . "\n" . 
+		"##contig=<ID=$file_prefix,assembly=1,length=$seed_seq_length>\n" . 
 		"##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n" . 
 		"##INFO=<ID=AC,Number=A,Type=Integer,Description=\"Total number of alternate alleles in called genotypes\">\n" . 
 		"##INFO=<ID=AF,Number=A,Type=Float,Description=\"Estimated allele frequency in the range (0,1)\">\n" . 
@@ -666,7 +700,9 @@ if ($vcf_output =~ /\w+/) {
 		"##INFO=<ID=OG_DIVERGED,Number=0,Type=Flag,Description=\"indicates that one or more outgroup alleles differs from one or more ingroup alleles\">\n" . 
 		"##INFO=<ID=OG_SHARE,Number=0,Type=Flag,Description=\"indicates one or more outgroup alleles matches one or more ingroup alleles\">\n" . 
 		"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
-		
+	
+	print OUT_TREVOLVER_VCF "$header_VCF";
+	
 	foreach my $taxon (sort {$a <=> $b} keys %taxa_histories) {
 		
 		# OUTGROUP(S), if any
@@ -1045,9 +1081,13 @@ print "\n\n#####################################################################
 print "# SUMMARY OF RESULTS:\n";
 print "#########################################################################################\n";
 
+if ($burn_in) {
+	print "\ntotal number of mutations during burn-in period: $num_burn_in_mutations\n";
+}
+
 print "\ntotal number of mutations on all branches: $num_mutations\n";
 print "\ntotal branch length (generations): $total_branch_length\n";
-print "\nbranch-to-tip length (generations): $branch_to_tip_length\n";
+print "\nroot-to-tip length (generations): $root_to_tip_length\n";
 print "\ntotal number of mutations occurred: $num_mutations\n";
 print "\nlength of run in seconds: " . (time - $time1) . "\n\n";
 
@@ -1102,6 +1142,210 @@ if($track_mutations || $tracked_motif) {
 }
 
 exit;
+
+
+##########################################################################################
+##########################################################################################
+### SUBROUTINE: BURN-IN evolution
+##########################################################################################
+##########################################################################################
+sub burn_in {
+	
+	my($curr_sequence, $generations) = @_;
+	my $generations_elapsed = 0;
+	
+	if ($verbose) {
+		print "\n##########################################################################################\n";
+		print "Burning in for $generations generations\n";
+	}
+	
+	# Tally all trinucleotides in sequence; first and last nucleotides ignored.
+	my %trint_counts;
+	my $trint_counts_sum = 0;
+	for (my $seq_index = 0; ($seq_index + 2) < length($curr_sequence); $seq_index++) {
+		$trint_counts{substr($curr_sequence, $seq_index, 3)}++;
+		$trint_counts_sum++;
+	}
+	
+	# Calculate weighted mean mutation rate per generation.
+	my $mut_rate_overall = 0;
+	foreach (keys %trint_counts) {
+		my $rate_row_sum = $rate_matrix{$_}->{'A'} + $rate_matrix{$_}->{'C'} + 
+								$rate_matrix{$_}->{'G'} + $rate_matrix{$_}->{'T'};
+		
+		$mut_rate_overall += ($trint_counts{$_} * $rate_row_sum);
+	}
+	
+	if($verbose) { print "starting mutation rate: $mut_rate_overall\n" }
+	
+	# Generate random exponential waiting time to next mutation
+	my $rand_number = rand();
+	my $waiting_time = -(1 / $mut_rate_overall) * log($rand_number);
+	my $waiting_time_output_buffer = '';
+	
+	while ($waiting_time < $generations) { # a new mutation!
+		$num_burn_in_mutations++; # global
+		
+		# which site and nucleotide change?
+		my $rand_number2 = rand($mut_rate_overall);
+		
+		my $curr_rate_max = 0;
+		my $mutation_complete = 0;
+		
+		my $mutation_site_index;
+		my $trint_AA = '';
+		my $trint_DA = '';
+		my $prev_trint_AA = '';
+		my $prev_trint_DA = '';
+		my $next_trint_AA = '';
+		my $next_trint_DA = '';
+		my $nt_AA = '';
+		my $nt_DA = '';
+		
+		DETERMINE_MUTATION: for (my $seq_index = 0; ($seq_index + 2) < length($curr_sequence); $seq_index++) {
+			my $trint = substr($curr_sequence, $seq_index, 3);
+			
+			foreach my $nt (qw/A C G T/) {
+				$curr_rate_max += $rate_matrix{$trint}->{$nt};
+				
+				if ($rand_number2 < $curr_rate_max) { # this one was it!
+					
+					$mutation_site_index = $seq_index + 1;
+					
+					$waiting_time_output_buffer .= "MUTATION at burn-in generation " . ($generations_elapsed + $waiting_time) . "! $trint" . ($mutation_site_index + 1);
+					
+					# Prev and next overlapping trinucleotides
+					
+					# don't look at prev trint for FIRST trint
+					unless($seq_index == 0) {
+						$prev_trint_AA = substr($curr_sequence, $seq_index - 1, 3);
+						$prev_trint_DA = $prev_trint_AA;
+						substr($prev_trint_DA, 2, 1, $nt);
+					}
+					
+					# don't look at next trint for LAST trint
+					unless(($seq_index + 3) >= length($curr_sequence)) {
+						$next_trint_AA = substr($curr_sequence, $seq_index + 1, 3);
+						$next_trint_DA = $next_trint_AA;
+						substr($next_trint_DA, 0, 1, $nt);
+					}
+					
+					$trint_AA = $trint;
+					$nt_AA = substr($trint, 1, 1, $nt); # returns what was there before replacement
+					
+					$waiting_time_output_buffer .= "$trint";
+					$trint_DA = $trint;
+					$nt_DA = $nt;
+					
+					# change state of actual sequence
+					substr($curr_sequence, $mutation_site_index, 1, $nt);
+					
+					$mutation_complete = 1;
+					last DETERMINE_MUTATION;
+				}
+			}
+		}
+		
+		# For that EXTREMELY RARE case where it's the last site, last nucleotide (T)
+		#my $trint = substr($curr_sequence, length($curr_sequence) - 3, 3);
+		#print "VERY LAST TRINT!! $trint\n";
+		unless($mutation_complete == 1) { # very last site, nucleotide T
+			my $trint = substr($curr_sequence, length($curr_sequence) - 3, 3);
+			
+			$mutation_site_index = (length($curr_sequence) - 2);
+			
+			$waiting_time_output_buffer .= "MUTATION at burn-in generation " . ($generations_elapsed + $waiting_time) . "! $trint" . ($mutation_site_index + 1);
+			
+			# Prev and next overlapping trinucleotides
+			
+			# don't look at prev trint for FIRST trint
+			unless(length($curr_sequence) == 3) {
+				$prev_trint_AA = substr($curr_sequence, (length($curr_sequence) - 4), 3);
+				$prev_trint_DA = $prev_trint_AA;
+				substr($prev_trint_DA, 2, 1, 'T');
+			}
+			
+			$trint_AA = $trint;
+			$nt_AA = substr($trint, 1, 1, 'T'); # returns what was there before replacement
+			
+			$waiting_time_output_buffer .= "$trint";
+			$trint_DA = $trint;
+			$nt_DA = 'T';
+			
+			# NO NEXT TRINUCLEOTIDE!
+			
+			# change state of actual sequence
+			substr($curr_sequence, $mutation_site_index, 1, 'T'); # DOUBLE CHECK THAT
+			$mutation_complete = 1;
+		}
+		
+		# UPDATE the number of generations REMAINING on the branch
+		$generations = $generations - $waiting_time;
+		$generations_elapsed += $waiting_time;
+		
+		# UPDATE number of trinucleotides in sequence, taking advantage of 1 mutation 
+		# at a time. One nucleotide change will affect 3 overlapping trinucleotides.
+		# Sum (number of trints, 2 less the number of sites) will remain the same. 
+		# Also update the overall mutation rate.
+		
+		# SUBTRACT obliterated (ancestral) trinucleotide values
+		if($prev_trint_AA ne '') {
+			$trint_counts{$prev_trint_AA}--;
+			my $rate_row_sum_prev_trint_AA = $rate_matrix{$prev_trint_AA}->{'A'} + $rate_matrix{$prev_trint_AA}->{'C'} + 
+										$rate_matrix{$prev_trint_AA}->{'G'} + $rate_matrix{$prev_trint_AA}->{'T'};
+			$mut_rate_overall -= $rate_row_sum_prev_trint_AA;
+		}
+		
+		$trint_counts{$trint_AA}--;
+		my $rate_row_sum_AA = $rate_matrix{$trint_AA}->{'A'} + $rate_matrix{$trint_AA}->{'C'} + 
+									$rate_matrix{$trint_AA}->{'G'} + $rate_matrix{$trint_AA}->{'T'};
+		$mut_rate_overall -= $rate_row_sum_AA;
+		
+		if($next_trint_AA ne '') {
+			$trint_counts{$next_trint_AA}--;
+			my $rate_row_sum_next_trint_AA = $rate_matrix{$next_trint_AA}->{'A'} + $rate_matrix{$next_trint_AA}->{'C'} + 
+										$rate_matrix{$next_trint_AA}->{'G'} + $rate_matrix{$next_trint_AA}->{'T'};
+			$mut_rate_overall -= $rate_row_sum_next_trint_AA;
+		}
+		
+		# ADD spontaneously generated (derived) trinucleotide values
+		if($prev_trint_DA ne '') {
+			$trint_counts{$prev_trint_DA}++;
+			my $rate_row_sum_prev_trint_DA = $rate_matrix{$prev_trint_DA}->{'A'} + $rate_matrix{$prev_trint_DA}->{'C'} + 
+										$rate_matrix{$prev_trint_DA}->{'G'} + $rate_matrix{$prev_trint_DA}->{'T'};
+			$mut_rate_overall += $rate_row_sum_prev_trint_DA;
+		}
+		
+		$trint_counts{$trint_DA}++;
+		my $rate_row_sum_DA = $rate_matrix{$trint_DA}->{'A'} + $rate_matrix{$trint_DA}->{'C'} + 
+									$rate_matrix{$trint_DA}->{'G'} + $rate_matrix{$trint_DA}->{'T'};
+		$mut_rate_overall += $rate_row_sum_DA; # for example, if CpG created, may be higher
+		
+		if($next_trint_DA ne '') {
+			$trint_counts{$next_trint_DA}++;
+			my $rate_row_sum_next_trint_DA = $rate_matrix{$next_trint_DA}->{'A'} + $rate_matrix{$next_trint_DA}->{'C'} + 
+										$rate_matrix{$next_trint_DA}->{'G'} + $rate_matrix{$next_trint_DA}->{'T'};
+			$mut_rate_overall += $rate_row_sum_next_trint_DA;
+		}
+		
+		$waiting_time_output_buffer .= "; new mutation rate: $mut_rate_overall\n";
+		
+		# New waiting time
+		$rand_number = rand();
+		$waiting_time = -(1 / $mut_rate_overall) * log($rand_number);
+	} # finish a new mutation
+	
+	# EMPTY BUFFER
+	if($verbose) { print "$waiting_time_output_buffer" }
+	$waiting_time_output_buffer = '';
+	
+	if($verbose) { print "BURN-IN EVOLUTION COMPLETE\n" }
+	
+	return $curr_sequence;
+	
+} # END SUBROUTINE
+
+
 
 
 
@@ -1370,10 +1614,10 @@ sub determine_outgroup_data {
 		# Add the remaining time in which mutation DIDN'T occur.
 		$generations_elapsed += $generations;
 		
-		if($branch_to_tip_length == 0) {
-			$branch_to_tip_length = $generations_elapsed;
-		} elsif (int($branch_to_tip_length) != int($generations_elapsed)) {
-			die "\n### WARNING: conflicting branch-to-tip length measures for taxon $taxon\: $branch_to_tip_length vs. $generations_elapsed\. TERMINATED.\n\n";
+		if($root_to_tip_length == 0) {
+			$root_to_tip_length = $generations_elapsed;
+		} elsif (int($root_to_tip_length) != int($generations_elapsed)) {
+			die "\n### WARNING: conflicting root-to-tip length measures for taxon $taxon\: $root_to_tip_length vs. $generations_elapsed\. TERMINATED.\n\n";
 		}
 		
 		if($verbose) { print "evolution of terminal taxon complete; generations_elapsed: " . sprintf("%.3f", $generations_elapsed) . "\n" }
@@ -1384,19 +1628,12 @@ sub determine_outgroup_data {
 } # END SUBROUTINE
 
 
-
-
-
-
-
-
-
 ##########################################################################################
 ##########################################################################################
 ### SUBROUTINE: recursive evolution approach
 ##########################################################################################
 ##########################################################################################
-sub evolve_two_subtrees {
+sub evolve_branch {
 	
 	my($tree, $generations_elapsed, $mutation_count, $nodes, $mutation_history_ref) = @_;
 #	if($verbose) { print "We got the arguments: @_\n" }
@@ -1495,10 +1732,10 @@ sub evolve_two_subtrees {
 					
 					# Recursively evolve subtrees
 					if ($verbose) { print "Analyzing subtree1...\n" }
-					evolve_two_subtrees($subtree1, $generations_elapsed, $mutation_count, $nodes, \%mutation_history);
+					evolve_branch($subtree1, $generations_elapsed, $mutation_count, $nodes, \%mutation_history);
 					
 					if ($verbose) { print "Analyzing subtree2...\n" }
-					evolve_two_subtrees($subtree2, $generations_elapsed, $mutation_count, $nodes, \%mutation_history);
+					evolve_branch($subtree2, $generations_elapsed, $mutation_count, $nodes, \%mutation_history);
 					
 					return;
 				}
@@ -1912,7 +2149,7 @@ sub evolve_two_subtrees {
 #			}
 			
 			if($verbose) { print "Analyzing internal_node...\n" }
-			evolve_two_subtrees($internal_node, $generations_elapsed, $mutation_count, $nodes, \%mutation_history);
+			evolve_branch($internal_node, $generations_elapsed, $mutation_count, $nodes, \%mutation_history);
 			
 		##################################################################################
 		### SUBTREE PATTERN
@@ -1965,10 +2202,10 @@ sub evolve_two_subtrees {
 			
 			### Recursively evolve subtrees
 			if($verbose) { print "Analyzing subtree1...\n" }
-			evolve_two_subtrees($subtree1, $generations_elapsed, $mutation_count, $nodes, \%mutation_history);
+			evolve_branch($subtree1, $generations_elapsed, $mutation_count, $nodes, \%mutation_history);
 			
 			if($verbose) { print "Analyzing subtree2...\n" }
-			evolve_two_subtrees($subtree2, $generations_elapsed, $mutation_count, $nodes, \%mutation_history);
+			evolve_branch($subtree2, $generations_elapsed, $mutation_count, $nodes, \%mutation_history);
 		
 		##################################################################################
 		## NO RECOGNIZABLE PATTERN: ABORT!
@@ -2246,10 +2483,10 @@ sub evolve_two_subtrees {
 		# Add the remaining time in which mutation DIDN'T occur.
 		$generations_elapsed += $generations;
 		
-		if($branch_to_tip_length == 0) {
-			$branch_to_tip_length = $generations_elapsed;
-		} elsif (int($branch_to_tip_length) != int($generations_elapsed)) {
-			die "\n### WARNING: conflicting branch-to-tip length measures for taxon $taxon\: $branch_to_tip_length vs. $generations_elapsed\. TERMINATED.\n\n";
+		if($root_to_tip_length == 0) {
+			$root_to_tip_length = $generations_elapsed;
+		} elsif (int($root_to_tip_length) != int($generations_elapsed)) {
+			die "\n### WARNING: conflicting root-to-tip length measures for taxon $taxon\: $root_to_tip_length vs. $generations_elapsed\. TERMINATED.\n\n";
 		}
 		
 		if($verbose) { print "evolution of terminal taxon complete; generations_elapsed: " . sprintf("%.3f", $generations_elapsed) . "\n" }
@@ -2322,6 +2559,8 @@ sub print_usage_message {
 			"\t\ttaxa does not exist for the user-specified number (*e.g.*, if `--outgroups=2` is called,\n" . 
 			"\t\tbut the two deepest splits contain three rather than two taxa), a warning is printed and\n" . 
 			"\t\tno outgroups are used.\n";
+	print "\t--burn_in (OPTIONAL): number of generations to 'burn in' sequence evolution before initiating\n" . 
+			"\t\tevolution at the tree root, e.g., 10N or 20N generations.\n";
 	print "\t--vcf_output (OPTIONAL): name of a VCF format output file to be placed in the working\n" . 
 			"\t\tdirectory unless a full path name is given. If not specified, a file will be printed\n" .
 			"\t\tin the working directory with a .vcf extension.\n";
@@ -2335,49 +2574,51 @@ sub print_usage_message {
 	print "\t--verbose (OPTIONAL): tell trevolver to tell you EVERYTHING that happens.\n" . 
 			"\t\tNot recommended except for development and debugging purposes.\n";
 		
-	
 	print "\n################################################################################\n";
 	print "### EXAMPLES:\n";
 	print "################################################################################\n";
-	
-	
-	
+
+	print "\n### FORMAT\n";
+
+	print "\n\ttrevolver.pl --tree=<newick>.txt --seed_sequence=<seed>.fasta --rate_matrix=<64x4>.txt \\\n" . 
+		"\t--branch_unit=<#> --random_seed=<#>\n";
+
 	print "\n### EXAMPLE 1: A SIMPLE SIMULATION\n";
 
-	print "\n\ttrevolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa \\\n" .
-			"\t--rate_matrix=mutation_CpGx20.txt --vcf_output=example1.vcf --branch_unit=10000 \\\n" .
-			"\t> example1.txt\n";
-			
-	print "\n### EXAMPLE 2: MANY OPTIONS USED\n";
-
-	print "\n\ttrevolver.pl --tree=tree_7taxa.txt --seed_sequence=seed_sequence.fa \\\n" .
-			"\t--rate_matrix=mutation_equal.txt --branch_unit=144740 --random_seed=123456789 \\\n" .
-			"\t--tracked_motif=CG --track_mutations --vcf_output=example2.vcf --outgroups=2 \\\n" .
-			"\t--suppress_seed_seq --suppress_consensus_seq --verbose > example2.txt\n";
-			
-	print "\n### EXAMPLE 3: TYPICAL USAGE (program decides random seed; not verbose)\n";
-
-	print "\n\ttrevolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa \\\n" .
-			"\t--rate_matrix=mutation_CpGx20.txt --branch_unit=144740 --track_mutations \\\n" .
-			"\t--tracked_motif=CG --vcf_output=example3.vcf > example3.txt\n";
-			
-	print "\n### EXAMPLE 4: SIMULATION WITH TWO OUTGROUPS\n";
-
-	print "\n\ttrevolver.pl --tree=tree_10taxa.txt --seed_sequence=seed_sequence.fa \\\n" .
-			"\t--rate_matrix=mutation_CpGx20.txt --branch_unit=144740 --track_mutations \\\n" .
-			"\t--tracked_motif=CG --vcf_output=example4.vcf --outgroups=2 > example4.txt\n";
-			
-	print "\n### EXAMPLE 5: EVOLVE A SINGLE SEQUENCE FOR 1 MILLION GENERATIONS\n";
-
-	print "\n\ttrevolver.pl --tree=tree_1taxon.txt --seed_sequence=seed_sequence.fa \\\n" .
-			"\t--rate_matrix=mutation_equal.txt --vcf_output=example5.vcf --branch_unit=1 \\\n" .
-			"\t> example5.txt\n";
-			
-	print "\n### EXAMPLE 6: MINIMUM OPTIONS WITH OUTPUT TO SCREEN\n";
-
-	print "\n\ttrevolver.pl --tree=tree_7taxa.txt --seed_sequence=seed_sequence.fa \\\n" .
-			"\t--rate_matrix=mutation_CpGx20.txt --branch_unit=1447\n";
+	print "\n\ttrevolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa --rate_matrix=mutation_CpGx20.txt \\\n" . 
+		"\t--vcf_output=example1.vcf --branch_unit=10000 > example1.txt\n";
 	
+	print "\n### EXAMPLE 2: A SIMPLE SIMULATION WITH 1,000-GENERATION BURN-IN\n";
+	
+	print "\n\ttrevolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa --rate_matrix=mutation_CpGx20.txt \\\n" . 
+		"\t--vcf_output=example2.vcf --branch_unit=10000 --burn_in=1000 > example2.txt\n";
+	
+	print "\n### EXAMPLE 3: TYPICAL USAGE (program decides random seed; not verbose)\n";
+	
+	print "\n\ttrevolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa --rate_matrix=mutation_CpGx20.txt \\\n" . 
+		"\t--branch_unit=144740 --track_mutations --tracked_motif=CG --vcf_output=example3.vcf > example3.txt\n";
+	
+	print "\n### EXAMPLE 4: SIMULATION WITH TWO OUTGROUPS\n";
+	
+	print "\n\ttrevolver.pl --tree=tree_10taxa.txt --seed_sequence=seed_sequence.fa --rate_matrix=mutation_CpGx20.txt \\\n" . 
+		"\t--branch_unit=144740 --track_mutations --tracked_motif=CG --vcf_output=example4.vcf --outgroups=2 > example4.txt\n";
+	
+	print "\n### EXAMPLE 5: EVOLVE A SINGLE SEQUENCE FOR 1 MILLION GENERATIONS\n";
+	
+	print "\n\ttrevolver.pl --tree=tree_1taxon.txt --seed_sequence=seed_sequence.fa --rate_matrix=mutation_equal.txt \\\n" . 
+		"\t--vcf_output=example5.vcf --branch_unit=1 > example5.txt\n";
+	
+	print "\n### EXAMPLE 6: MANY OPTIONS USED\n";
+	
+	print "\n\ttrevolver.pl --tree=tree_7taxa.txt --seed_sequence=seed_sequence.fa --rate_matrix=mutation_equal.txt \\\n" . 
+		"\t--branch_unit=144740 --random_seed=123456789 --tracked_motif=CG --track_mutations --vcf_output=example6.vcf \\\n" . 
+		"\t--outgroups=2 --burn_in=500 --suppress_seed_seq --suppress_consensus_seq --verbose > example6.txt\n";
+
+	print "\n### EXAMPLE 7: MINIMUM OPTIONS WITH OUTPUT TO SCREEN\n";
+	
+	print "\n\ttrevolver.pl --tree=tree_7taxa.txt --seed_sequence=seed_sequence.fa --rate_matrix=mutation_CpGx20.txt \\\n" . 
+		"\t--branch_unit=1447\n";
+
 	print "\n################################################################################\n";
 	print "################################################################################\n\n";
 	
@@ -2387,6 +2628,4 @@ sub print_usage_message {
 
 
 exit;
-
-
 

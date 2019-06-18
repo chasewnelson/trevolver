@@ -10,7 +10,7 @@ To test the simulation with the example data, execute the program at the Unix co
 	--rate_matrix=<64x4>.txt  --branch_unit=<#> --track_mutations \
 	--tracked_motif=<ACGT> --verbose > <output_name>.txt
 
-Find some real [examples](#examples) below.
+Find some real [examples](#examples) below. Check out our <a target="_blank" rel="noopener noreferrer" href="https://www.biorxiv.org/content/10.1101/672717v1">preprint on bioRxiv</a>.
 
 ## <a name="contents"></a>Contents
 
@@ -58,6 +58,7 @@ Call **Trevolver** using the following options:
 * `--track_mutations` (*OPTIONAL*): reports the mutation rate and count over time.
 * `--excluded_taxa` (*OPTIONAL*): path of **file containing a list of taxa names** (comma-separated) to be treated as outgroups, *i.e.*, excluded from the VCF file and the consensus sequence(s). This might be desirable if a small number of taxa represent outgroups, to which polymorphism in an ingroup is being compared.
 * `--outgroups` (*OPTIONAL*): **number of outgroups** to be excluded for identification of the ingroup most recent common ancestor (MRCA) and for calculation of ingroup variant frequencies in the VCF file. Outgroups are considered to be the most deeply-branching terminal taxa (external nodes). For example, if `--outgroups=2` is specified, the fixed tree is navigated starting at the root. At each internal node, the branch containing the fewest terminal taxa is considered to contain the outgroup(s). Once the user-specified number of outgroups is identified, the most recent common ancestor (MRCA) node of the remaining (ingroup) taxa is identified and reported. If a set of non-arbitrary outgroup taxa does not exist for the user-specified number (*e.g.*, if `--outgroups=2` is called, but the two deepest splits contain three rather than two taxa), a warning is printed and no outgroups are used.
+* `--burn_in` (*OPTIONAL*): number of generations to 'burn in' sequence evolution before initiating evolution at the tree root. Note that this is measured in absolute number of generations, **not** in branch units. Standard practice is 10*N* or 20*N* generations, where *N* is the (effective) population size.
 * `--vcf_output` (*OPTIONAL*): name of a [VCF format output file](#vcf-output) to be generated in the working directory, unless a full path name is given. If not specified, a file will be printed in the working directory with a `.vcf` extension using the name of the tree file as a prefix.
 * `--suppress_seed_seq` (*OPTIONAL*): suppress printing the ancestral (seed) sequence in the output. This might be desirable if the seed sequence is very large and its inclusion in the output consumes too much disk space.
 * `--suppress_MRCA_seq` (*OPTIONAL*): prevents the MRCA (ingroup most recent common ancestor) sequence from being printed.
@@ -66,21 +67,20 @@ Call **Trevolver** using the following options:
 
 ## <a name="examples"></a>EXAMPLES
 
-Example input and output files are available in the `EXAMPLE_INPUT` and `EXAMPLE_OUTPUT` directories at this GitHub page, where reproducible examples are numbered (*e.g.*, **output_example1.txt**). When the random seed has not been specified, exact results can be reproduced by using the same random number seed reported in the output file present in `EXAMPLE_OUTPUT`. Note that, if your input file(s) (*e.g.*, **tree\_6taxa.txt**) are not in the working directory (*i.e.*, where your Terminal is currently operating), you will need to specify the full path of the file name (*e.g.*, **/Users/chasely/Desktop/trevolver\_practice/tree\_6taxa.txt**). Also note that, in the examples below, a `\` is used simply to continue the previous command on the line.
+Example input and output files are available in the `EXAMPLE_INPUT` and `EXAMPLE_OUTPUT` directories at this GitHub page, where reproducible examples are numbered (*e.g.*, **output_example1.txt**). When the random seed has not been specified, exact results can be reproduced by using the same random number seed reported in the output file present in `EXAMPLE_OUTPUT`. Note that, if your input file(s) (*e.g.*, **tree\_6taxa.txt**) are not in the working directory (*i.e.*, where your Terminal is currently operating), you will need to specify the full path of the file name (*e.g.*, **/Users/ohta/Desktop/trevolver\_practice/tree\_6taxa.txt**). Also note that, in the examples below, a `\` is used simply to continue the previous command on the line.
 
 ### EXAMPLE 1: A SIMPLE SIMULATION
 
 	trevolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa \
 	--rate_matrix=mutation_CpGx20.txt --vcf_output=example1.vcf --branch_unit=10000 \
 	> example1.txt
-	
-### EXAMPLE 2: MANY OPTIONS USED
 
-	trevolver.pl --tree=tree_7taxa.txt --seed_sequence=seed_sequence.fa \
-	--rate_matrix=mutation_equal.txt --branch_unit=144740 --random_seed=123456789 \
-	--tracked_motif=CG --track_mutations --vcf_output=example2.vcf --outgroups=2 \
-	--suppress_seed_seq --suppress_consensus_seq --verbose > example2.txt
-	
+### EXAMPLE 2: A SIMPLE SIMULATION WITH 1,000-GENERATION BURN-IN
+
+	trevolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa \
+	--rate_matrix=mutation_CpGx20.txt --vcf_output=example2.vcf --branch_unit=10000 \
+	--burn_in=1000 > example2.txt
+
 ### EXAMPLE 3: TYPICAL USAGE (program decides random seed; not verbose)
 
 	trevolver.pl --tree=tree_6taxa.txt --seed_sequence=seed_sequence.fa \
@@ -92,16 +92,24 @@ Example input and output files are available in the `EXAMPLE_INPUT` and `EXAMPLE
 	trevolver.pl --tree=tree_10taxa.txt --seed_sequence=seed_sequence.fa \
 	--rate_matrix=mutation_CpGx20.txt --branch_unit=144740 --track_mutations \
 	--tracked_motif=CG --vcf_output=example4.vcf --outgroups=2 > example4.txt
+	
+### EXAMPLE 5: EVOLVE A SINGLE SEQUENCE FOR 1 MILLION GENERATIONS
 
-### <a name="example-5"></a>EXAMPLE 5: EVOLVE A SINGLE SEQUENCE FOR 1 MILLION GENERATIONS
-
-See explanation in [Troubleshooting](#troubleshooting).
+To simulate the evolution of a single sequence, provide a tree with only one taxon and branch length. For example, to simulate the evolution of a single sequence named "my_creature" for 1 million generations, the tree file would contain, simply, `(my_creature:1000000);`. Provide a scaling factor (`--branch_unit`) of 1, and you're good to go:
 
 	trevolver.pl --tree=tree_1taxon.txt --seed_sequence=seed_sequence.fa \
 	--rate_matrix=mutation_equal.txt --vcf_output=example5.vcf --branch_unit=1 \
 	> example5.txt
+	
+### EXAMPLE 6: MANY OPTIONS USED
 
-### EXAMPLE 6: MINIMUM OPTIONS WITH OUTPUT TO SCREEN
+	trevolver.pl --tree=tree_7taxa.txt --seed_sequence=seed_sequence.fa \
+	--rate_matrix=mutation_equal.txt --branch_unit=144740 --random_seed=123456789 \
+	--tracked_motif=CG --track_mutations --vcf_output=example6.vcf --outgroups=2 \
+	--burn_in=500 --suppress_seed_seq --suppress_consensus_seq --verbose \
+	> example6.txt
+
+### EXAMPLE 7: MINIMUM OPTIONS WITH OUTPUT TO SCREEN
 
 This will automatically generate a VCF file named **tree\_7taxa\_trevolver.vcf** in the working directory.
 
@@ -118,15 +126,16 @@ The beginning of the output will report:
 
 * `COMMAND`: how Trevolver was called.
 * `RANDOM_SEED`: the random seed used.
-* `SEED_SEQUENCE`: the nucleotide sequence used to seed the simulation.
+* `INPT_SEQUENCE`: the nucleotide sequence used as input.
+* `SEED_SEQUENCE`: the nucleotide sequence used to seed the simulation. If there is no burn-in time, this is identical to the `INPT_SEQUENCE`.
+* `MRCA_SEQUENCE`: nucleotide sequence of the ingroup MRCA (most recent common ancestor).
+* `CONS_SEQUENCE`: consensus nucleotide sequence of the ingroup at the end of the simulation (*i.e.*, tree tips).
 * `TREE`: the fixed tree on which the simulation took place.
 * `MRCA_GENERATION`: the generation (from time 0 at the root) in which the most recent common ancestor (MRCA) of the ingroup lived.
 * `MRCA_SUBTREE`: the subtree for which the MRCA is the root.
 * `OUTGROUPS`: names of the outgroups, if applicable.
 * `MRCA_NODE_ID`: node ID of the MRCA.
-* `MRCA_SEQUENCE`: nucleotide sequence of the MRCA.
 * `VCF_OUTPUT_FILE`: file name of the VCF output.
-* `CONSENSUS_SEQUENCE`: consensus nucleotide sequence of the ingroup at the end of the simulation (*i.e.*, tree tips).
 
 Additionally, following a brief **SUMMARY OF RESULTS**, the following flags indicate separate sections of more detailed output:
 
@@ -135,7 +144,15 @@ Additionally, following a brief **SUMMARY OF RESULTS**, the following flags indi
 
 ### <a name="vcf-output"></a>VCF Output
 
-The <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) output conforms to format VCFv4.1, such as used by the 1000 Genomes Project GRCh38/hg38 release, with some notable exceptions. A consensus sequence (and ingroup ancestral and seed sequence) is printed in the header metadata for convenience unless `--suppress_consensus_seq` (or `--suppress_MRCA_seq` or `--suppress_seed_seq`) is called. First, additional metadata headers (lines beginning with `##`) are used to indicate arguments used as **Trevolver** input, for convenience and reproducibility. Headers that are irrelevant (*e.g.*, non-single nucleotide variant descriptors) have been removed. Additionally, six data types have been added to the `INFO` column:
+The <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) output conforms to format VCFv4.1, such as used by the 1000 Genomes Project GRCh38/hg38 release, with some notable exceptions. For convenience and reproducibility, additional metadata headers (lines beginning with `##`) are used to indicate arguments used as **Trevolver** input, key results, and experiment specifications, including those described in [Standard Output](#standard-output) as well as:
+
+* `burn_in_mutations`: total number of mutations during burn-in period.
+* `total_mutations`: total number of mutations on all branches (excluding burn-in).
+* `tree_length`: total branch length (generations).
+* `experiment_length`: root-to-tip length (generations). It is currently required that all root-to-tip lengths, measured in generations, are equal.
+* `simulation_time`: length of run (seconds).
+
+Headers that are irrelevant (*e.g.*, non-single nucleotide variant descriptors) have been removed. The input, seed, consensus (ingroup), and MRCA (ingroup) sequences are printed in the header metadata for convenience unless `--suppress_input_seq`, `--suppress_seed_seq`, `--suppress_consensus_seq`, or `--suppress_MRCA_seq` are called. Additionally, numerous data types (many unknowable in real-life evolutionary analyses) have been added to the `INFO` column:
 
 * `REF`/`REF_OG`: the consensus (major) allele of the ingroup/outgroup(s), which may or may not match the `AA` (ancestral allele).
 * `AA`: ancestral allele of whole tree (the allele of the seed sequence).
@@ -162,9 +179,7 @@ The <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call
 
 ## <a name="troubleshooting"></a>Troubleshooting
 
-If you have questions about **Trevolver**, please click on the <a target="_blank" href="https://github.com/chasewnelson/trevolver/issues">Issues</a> tab at the top of this page and begin a new thread, so that others might benefit from the discussion.
-
-* **Simulating a single sequence.** It is entirely possible to simulate the evolution of a single sequence. Simply provide a tree with only one taxon and branch length. For example, to simulate the evolution of a single sequence named "my_creature" for 1 million generations, the tree file would contain, simply, `(my_creature:1000000);`. Provide a scaling factor (`--branch_unit`) of 1, and you're good to go: see [EXAMPLE 5](#example-5).
+If you have questions about **Trevolver**, please click on the <a target="_blank" href="https://github.com/chasewnelson/trevolver/issues">Issues</a> tab at the top of this page and begin a new thread, so that others might benefit from the discussion. Common questions will be addressed in this section.
 
 ## <a name="acknowledgments"></a>Acknowledgments
 **Trevolver** was written with support from a Gerstner Scholars Fellowship from the Gerstner Family Foundation at the American Museum of Natural History to C.W.N. (2016-2019), and is maintained with support from the same. The logo image was designed by Mitch Lin (2019); copyright-free DNA helix obtained from Pixabay. Thanks to Reed A. Cartwright, Michael Dean, Dan Graur, Ming-Hsueh Lin, Lisa Mirabello, Sergios Orestis-Kolokotronis, Michael Tessler, and Meredith Yeager for discussion.
@@ -173,7 +188,7 @@ If you have questions about **Trevolver**, please click on the <a target="_blank
 
 When using this software, please refer to and cite:
 
->Nelson CW, Fu Y, Li W-H. Trevolver: simulating non-reversible DNA sequence evolution in trinucleotide context on a bifurcating tree. Submitted to *Bioinformatics*.
+>Nelson CW, Fu Y, Li W-H. Trevolver: simulating non-reversible DNA sequence evolution in trinucleotide context on a bifurcating tree. Submitted to *Bioinformatics*. bioRxiv doi: <a target="_blank" rel="noopener noreferrer" href="https://www.biorxiv.org/content/10.1101/672717v1">https://doi.org/10.1101/672717</a>
 
 and this page:
 
