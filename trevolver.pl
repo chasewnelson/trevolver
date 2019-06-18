@@ -623,9 +623,14 @@ if ($vcf_output =~ /\w+/) {
 	
 	print OUT_TREVOLVER_VCF "##rate_matrix=$rate_matrix\n" . 
 		"##branch_unit=$branch_unit\n" . 
-		"##random_seed=$random_seed\n" . 
-		"##tracked_motif=$tracked_motif\n" . 
-		"##contig=<ID=$file_prefix,assembly=1,length=$seed_seq_length>\n" . 
+		"##random_seed=$random_seed\n";
+	
+	if ($tracked_motif) {
+		print OUT_TREVOLVER_VCF "##tracked_motif=$tracked_motif\n";
+	}
+	
+	
+	print OUT_TREVOLVER_VCF "##contig=<ID=$file_prefix,assembly=1,length=$seed_seq_length>\n" . 
 		"##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n" . 
 		"##INFO=<ID=AC,Number=A,Type=Integer,Description=\"Total number of alternate alleles in called genotypes\">\n" . 
 		"##INFO=<ID=AF,Number=A,Type=Float,Description=\"Estimated allele frequency in the range (0,1)\">\n" . 
@@ -633,6 +638,7 @@ if ($vcf_output =~ /\w+/) {
 		"##INFO=<ID=AN,Number=1,Type=Integer,Description=\"Total number of alleles in called genotypes, equivalent to number of extant sequences\">\n" . 
 		"##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total read depth; here, equivalent to number of extant sequences\">\n" . 
 		"##INFO=<ID=AA,Number=1,Type=String,Description=\"Ancestral Allele. AA: Ancestral allele, REF:Reference Allele, ALT:Alternate Allele\">\n" . 
+		"##INFO=<ID=MRCA,Number=1,Type=String,Description=\"Most Recent Common Ancestor Allele of the ingroup\">\n" . 
 		"##INFO=<ID=VT,Number=.,Type=String,Description=\"indicates what type of variant the line represents\">\n" . 
 		"##INFO=<ID=MUTATIONS,Number=.,Type=String,Description=\"unique mutations that occurred at this site\">\n" . 
 		"##INFO=<ID=MUTATIONS_OG,Number=.,Type=String,Description=\"unique mutations that occurred at this site in the outgroup(s)\">\n" . 
@@ -653,11 +659,13 @@ if ($vcf_output =~ /\w+/) {
 		"##INFO=<ID=NO_ANCESTRAL,Number=0,Type=Flag,Description=\"indicates that no ancestral (seed) alleles remain in the extant individuals of the ingroup\">\n" . 
 		"##INFO=<ID=ALLELES_OG,Number=.,Type=String,Description=\"list of all alleles present in the outgroup(s)\">\n" . 
 		"##INFO=<ID=ALLELE_COUNTS_OG,Number=.,Type=String,Description=\"list of all allele counts for alleles present in the outgroup(s), in the same order as ALLELES_OG\">\n" . 
+		"##INFO=<ID=REF_OG,Number=.,Type=String,Description=\"the consensus (major) allele of outgroup(s), which may or may not match the AA\">\n" . 
+		"##INFO=<ID=REF_OG_COUNT,Number=.,Type=Integer,Description=\"count of outgroup allele matching the outgroup consensus\">\n" . 
+		"##INFO=<ID=REF_OG_AF,Number=.,Type=Float,Description=\"frequency of outgroup allele matching the outgroup consensus\">\n" . 
 		"##INFO=<ID=OG_FIXED,Number=0,Type=Flag,Description=\"indicates that a site is fixed for one allele in the outgroup(s)\">\n" . 
 		"##INFO=<ID=OG_DIVERGED,Number=0,Type=Flag,Description=\"indicates that one or more outgroup alleles differs from one or more ingroup alleles\">\n" . 
 		"##INFO=<ID=OG_SHARE,Number=0,Type=Flag,Description=\"indicates one or more outgroup alleles matches one or more ingroup alleles\">\n" . 
 		"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
-		
 		
 	foreach my $taxon (sort {$a <=> $b} keys %taxa_histories) {
 		
@@ -680,6 +688,9 @@ if ($vcf_output =~ /\w+/) {
 		
 		# AA
 		my $AA = substr($seed_seq, $mutated_site - 1, 1);
+		
+		# MRCA ALLELE
+		my $MRCA_ALLELE = substr($MRCA_seq, $mutated_site - 1, 1);
 		
 		#print "AA=$AA\n";
 		
@@ -751,7 +762,9 @@ if ($vcf_output =~ /\w+/) {
 		chop($AF);
 		
 		$out_line .= "$fasta_header\t$mutated_site\t.\t$REF\t$ALT\t100\tPASS\t";
-		$out_line .= "AC=$AC\;AF=$AF\;AN=$AN_NS_DP\;NS=$AN_NS_DP\;DP=$AN_NS_DP\;AA=$AA\;VT=SNP\;"; 
+		$out_line .= "AC=$AC\;AF=$AF\;AN=$AN_NS_DP\;NS=$AN_NS_DP\;DP=$AN_NS_DP\;AA=$AA\;";
+		if ($outgroups) { $out_line .= "MRCA=$MRCA_ALLELE\;" }
+		$out_line .= "VT=SNP\;"; 
 		
 		
 		##################################################################################
@@ -825,7 +838,7 @@ if ($vcf_output =~ /\w+/) {
 		my $back_mutation_out = 0;
 		my $recurrent_mutation_out = 0;
 		
-		if ($outgroups > 0) {
+		if ($outgroups) {
 			foreach my $generation (sort {$a <=> $b} keys %{$site_to_outgroups{$mutated_site}->{history}}) {
 			
 				$hits_out++;
@@ -922,9 +935,21 @@ if ($vcf_output =~ /\w+/) {
 		
 		##################################################################################
 		# OUTGROUP (SUB) FLAGS
-		if ($outgroups > 0) {
-		
+		if ($outgroups) {
+			
+			# Define REF as the major (consensus) allele
+			my $REF_OG = '';
+			my $REF_OG_count = 0;
+			
+			foreach my $nt (@nts) {
+				if ($site_to_outgroups{$mutated_site}->{$nt} > $REF_OG_count) {
+					$REF_OG = $nt;
+					$REF_OG_count = $site_to_outgroups{$mutated_site}->{$nt};
+				}
+			}
+			
 			my $num_alleles_out = 0;
+			my $num_seqs_out = 0;
 			my @all_nts_present_out;
 			my $outgroup_alleles = '';
 			my $outgroup_counts = '';
@@ -935,14 +960,18 @@ if ($vcf_output =~ /\w+/) {
 					$num_alleles_out++;		
 					$outgroup_alleles .= "$nt\,";
 					$outgroup_counts .= $site_to_outgroups{$mutated_site}->{$nt} . "\,";
+					$num_seqs_out += $site_to_outgroups{$mutated_site}->{$nt};
 				}
 			}
 			
 			chop($outgroup_alleles);
 			chop($outgroup_counts);
 			
-			$out_line .= "ALLELES_OG=$outgroup_alleles\;";
-			$out_line .= "ALLELE_COUNTS_OG=$outgroup_counts\;";
+			# REF_OG_AF
+			my $REF_OG_AF = $site_to_outgroups{$mutated_site}->{$REF_OG} / $num_seqs_out;
+			
+			$out_line .= "REF_OG=$REF_OG\;REF_OG_COUNT=$REF_OG_count\;REF_OG_AF=$REF_OG_AF\;" . 
+					"ALLELES_OG=$outgroup_alleles\;ALLELE_COUNTS_OG=$outgroup_counts\;";
 			
 			if ($hits_out > 1) {
 				$out_line .= "MULTIH_OG\;";
@@ -1895,17 +1924,21 @@ sub evolve_two_subtrees {
 			
 			($subtree1, $subtree2) = sort($subtree1, $subtree2);
 			
-			if($verbose) { print "subtree1: $subtree1\nsubtree2: $subtree2\n" }
+			if ($verbose) { print "subtree1: $subtree1\nsubtree2: $subtree2\n" }
 			
-			#print "MRCA_subtree=$MRCA_subtree\nsubtree1=$subtree1\nsubtree2=$subtree2\n" . 
-			#	"MRCA_generation=$MRCA_generation\ngenerations_elapsed=$generations_elapsed\n";
-			#print "ROUNDED_MRCA_GENERATION=" . sprintf("%.${9}g", $MRCA_generation) . 
-			#	"\nROUNDED_GENERATIONS_ELAPSED=" . sprintf("%.${9}g", $generations_elapsed) . "\n";
+			if ($outgroups && $verbose) {
+				print "MRCA_subtree=$MRCA_subtree\nsubtree1=$subtree1\nsubtree2=$subtree2\n" . 
+					"MRCA_generation=$MRCA_generation\ngenerations_elapsed=$generations_elapsed\n";
+				#print "ROUNDED_MRCA_GENERATION=" . sprintf("%.${9}g", $MRCA_generation) . 
+				#	"\nROUNDED_GENERATIONS_ELAPSED=" . sprintf("%.${9}g", $generations_elapsed) . "\n";
+				#print "ROUNDED_MRCA_E+07_INT=" . int(10000000 * $MRCA_generation) . 
+				#	"\nROUNDED_GENERATIONS_ELAPSED_E+07_INT=" . int(10000000 * $generations_elapsed) . "\n";
+			}
 			
 			# CHECK IF MRCA OF INGROUP
-			if (int(1000000000 * $MRCA_generation) == int(1000000000 * $generations_elapsed) && $MRCA_subtree eq $tree) { # the time AND tree match
+			#if (int(1000000000 * $MRCA_generation) == int(1000000000 * $generations_elapsed) && $MRCA_subtree eq $tree) { # the time AND tree match
 			#if (sprintf("%.${9}g", $MRCA_generation) eq sprintf("%.${9}g", $generations_elapsed)) { # NO, get ROUNDED_MRCA_GENERATION=3e+04 and ROUNDED_GENERATIONS_ELAPSED=3e+04
-			#if ($MRCA_subtree eq $tree) {
+			if ($MRCA_subtree eq $tree) {
 			#if ($MRCA_subtree eq $subtree1 || $MRCA_subtree eq $subtree2 || ($MRCA_generation > 0 && $MRCA_generation == $generations_elapsed)) {
 				if($verbose) { print "encountered node containing MRCA subtree\n" }
 				
@@ -2254,8 +2287,11 @@ sub print_usage_message {
 	print "\n$specific_warning\n";
 	
 	print "\n################################################################################\n";
+	print "### OPTIONS:\n";
+	print "################################################################################\n";
 	
-	print "\nCALL trevolver.pl USING THE FOLLOWING OPTIONS:\n";
+	print "\n";
+	
 	print "\t--tree (REQUIRED): file containing a bifurcating evolutionary tree in newick\n" . 
 			"\t\tformat with branch lengths. NO NODE NAMES OR SUPPORT VALUES AT THIS TIME.\n" .
 			"\t\tOnly the first encountered tree is used.\n";

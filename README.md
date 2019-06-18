@@ -135,8 +135,11 @@ Additionally, following a brief **SUMMARY OF RESULTS**, the following flags indi
 
 ### <a name="vcf-output"></a>VCF Output
 
-The <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) output conforms to format VCFv4.1, such as used by the 1000 Genomes Project GRCh38/hg38 release, with some notable exceptions. The `REF` (reference) allele is defined as the consensus (major) allele, which may or may not match the `AA` (ancestral allele). A consensus sequence is printed for convenience (unless `--suppress_consensus` is called). First, additional metadata headers (lines beginning with `##`) are used to indicate arguments used as **Trevolver** input, for convenience and reproducibility. Headers that are irrelevant (*e.g.*, non-single nucleotide variant descriptors) have been removed. Additionally, six data types have been added to the `INFO` column:
+The <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call Format</a> (VCF) output conforms to format VCFv4.1, such as used by the 1000 Genomes Project GRCh38/hg38 release, with some notable exceptions. A consensus sequence (and ingroup ancestral and seed sequence) is printed in the header metadata for convenience unless `--suppress_consensus_seq` (or `--suppress_MRCA_seq` or `--suppress_seed_seq`) is called. First, additional metadata headers (lines beginning with `##`) are used to indicate arguments used as **Trevolver** input, for convenience and reproducibility. Headers that are irrelevant (*e.g.*, non-single nucleotide variant descriptors) have been removed. Additionally, six data types have been added to the `INFO` column:
 
+* `REF`/`REF_OG`: the consensus (major) allele of the ingroup/outgroup(s), which may or may not match the `AA` (ancestral allele).
+* `AA`: ancestral allele of whole tree (the allele of the seed sequence).
+* `MRCA`: Most Recent Common Ancestor (MRCA) allele with respect to the ingroup, if `--outgroups` is used.
 * `MUTATIONS`/`MUTATIONS_OG`: all unique mutations that have occurred at this site, *e.g.*, `G>A`. Multiple mutations are comma-separated (*e.g.*, `G>A,A>G`) in **chronological order**, for convenience in downstream analyses. If outgroups or excluded taxa are specified, `MUTATIONS` refers to only the ingroup, while `MUTATIONS_OG` refers to only the outgroup(s).
 * `GENERATIONS`/`GENERATIONS_OG`: time (generation) at which the unique mutation(s) occurred, comma-separated in the same order (**chronological**). If outgroups or excluded taxa are specified, `GENERATIONS ` refers to only the ingroup, while `GENERATIONS_OG` refers to only the outgroup(s).
 * `TAXA`/`TAXA_OG`: number of taxa which share the unique mutation(s), comma-separated in the same order (**chronological**). If outgroups or excluded taxa are specified, `TAXA` refers to only the ingroup, while `TAXA_OG` refers to only the outgroup(s).
@@ -148,6 +151,9 @@ The <a target="_blank" href="https://github.com/samtools/hts-specs">Variant Call
 * `INVARIANT_ANCESTRAL`: flag indicating a site has no polymorphism in the ingroup leaves (extant taxa), and that the fixed state matches the ancestral allele (AA). Thus, even if a mutation occurred in the history of the site, the derived allele was lost via back mutation.
 * `INVARIANT_DERIVED`: flag indicating a site has no polymorphism in the ingroup leaves (extant taxa), and that the fixed state matches a derived allele that resulted from mutation. This implies that all extant ingroup sequences are descended from a mutated ancestor.
 * `NO_ANCESTRAL`: flag indicating that no ancestral (seed) alleles remain in the extant individuals of the ingroup. Note that this is compatible with the presence of polymorphism, so long as none of the alleles match the ancestral allele.
+* `REF_OG`: the consensus (major) allele of outgroup(s), which may or may not match the AA.
+* `REF_OG_COUNT`: count of outgroup allele matching the outgroup consensus.
+* `REF_OG_AF`: frequency of outgroup allele matching the outgroup consensus.
 * `ALLELES_OG`: comma-separated list of all alleles present in the outgroup(s).
 * `ALLELE_COUNTS_OG`: comma-separated listed of all allele counts for alleles present in the outgroup(s), in the same order as `ALLELES_OG`.
 * `OG_FIXED`: flag indicating a site is fixed for one allele (*i.e.*, has no variation) in the outgroup(s). This will be true by definition if there is only only outgroup. Note that frequences of outgroup alleles can be retrieved from the `ALLELE_COUNTS_OG` data.
