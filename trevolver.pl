@@ -1617,7 +1617,8 @@ sub determine_outgroup_data {
 		if($root_to_tip_length == 0) {
 			$root_to_tip_length = $generations_elapsed;
 		} elsif (int($root_to_tip_length) != int($generations_elapsed)) {
-			die "\n### WARNING: conflicting root-to-tip length measures for taxon $taxon\: $root_to_tip_length vs. $generations_elapsed\. TERMINATED.\n\n";
+			die "\n### WARNING: conflicting root-to-tip length measures for taxon $taxon\: $root_to_tip_length vs. $generations_elapsed\.\n" . 
+				"### It is currently required that all root-to-tip lengths, measured in generations, are equal. TREVOLVER TERMINATED.\n\n";
 		}
 		
 		if($verbose) { print "evolution of terminal taxon complete; generations_elapsed: " . sprintf("%.3f", $generations_elapsed) . "\n" }
@@ -2486,7 +2487,8 @@ sub evolve_branch {
 		if($root_to_tip_length == 0) {
 			$root_to_tip_length = $generations_elapsed;
 		} elsif (int($root_to_tip_length) != int($generations_elapsed)) {
-			die "\n### WARNING: conflicting root-to-tip length measures for taxon $taxon\: $root_to_tip_length vs. $generations_elapsed\. TERMINATED.\n\n";
+			die "\n### WARNING: conflicting root-to-tip length measures for taxon $taxon\: $root_to_tip_length vs. $generations_elapsed\.\n" . 
+				"### It is currently required that all root-to-tip lengths, measured in generations, are equal. TREVOLVER TERMINATED.\n\n";
 		}
 		
 		if($verbose) { print "evolution of terminal taxon complete; generations_elapsed: " . sprintf("%.3f", $generations_elapsed) . "\n" }
