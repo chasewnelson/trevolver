@@ -32,7 +32,7 @@ New mutation data, including *de novo* mutations detected in whole genome sequen
 
 ## <a name="how-it-works"></a>How it Works
 
-**Trevolver** begins by placing the seed sequence on the root of the tree. It then proceeds to recursively traverse the tree from root to tip as an ordered binary tree structure. In other words, at each internal node, it processes the left child (and its left child, and so on) before processing the right child, where the left (first) descendant node is considered to be that which comes first using the alphabetic (not numeric) `sort()` function. Unique node ID's are assigned as the letter 'n' followed by an integer (*e.g.*, n5), where the root is considered n=1.
+**Trevolver** begins by placing the seed sequence on the root of the tree. It then proceeds to recursively traverse the tree from root to tip as an ordered binary tree structure. In other words, at each internal node, it processes the left child (and its left child, and so on) before processing the right child, where the left (first) descendant node is considered to be that which comes first using the alphabetic (not numeric) `sort()` function. Unique node ID's are assigned as the letter 'n' followed by an integer (*e.g.*, n5), where the root is considered n=0.
 
 When a single branch (as opposed to a cluster) is encountered, **Trevolver** begins to evolve the sequence along the branch. If the parent node of the branch also happens to be the root, the seed (ancestral) sequence is used as a starting point. Otherwise, a new and temporary copy of the seed sequence is created, into which the most recent allele at each mutated site is imputed. This saves computer memory, as each node need only inherit its mutational history, not an entire sequence, from its predeccesor.
 
@@ -63,6 +63,7 @@ Call **Trevolver** using the following options:
 * `--suppress_seed_seq` (*OPTIONAL*): suppress printing the ancestral (seed) sequence in the output. This might be desirable if the seed sequence is very large and its inclusion in the output consumes too much disk space.
 * `--suppress_MRCA_seq` (*OPTIONAL*): prevents the MRCA (ingroup most recent common ancestor) sequence from being printed.
 * `--suppress_consensus_seq` (*OPTIONAL*): prevents the consensus sequence (containing the `REF` allele, here defined as the major allele, at each site) from being printed.
+* `--suppress_MUTATION` (*OPTIONAL*): prevents the `//MUTATION` data from being printed.
 * `--verbose` (*OPTIONAL*): tell Trevolver to report EVERYTHING that happens. Not recommended except for development and debugging purposes.
 
 ## <a name="examples"></a>EXAMPLES
@@ -118,7 +119,7 @@ This will automatically generate a VCF file named **tree\_7taxa\_trevolver.vcf**
 
 ## <a name="output"></a>Output
 
-Depending on the options specified, **Trevolver** will output data immediately following single lines containing `//` and a descriptor.
+Depending on the options specified, **Trevolver** will output the following data:
 
 ### <a name="standard-output"></a>Standard Output
 

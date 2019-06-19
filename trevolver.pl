@@ -68,6 +68,7 @@ my $suppress_input_seq;
 my $suppress_seed_seq;
 my $suppress_MRCA_seq;
 my $suppress_consensus_seq;
+my $suppress_MUTATION;
 my $verbose;
 
 # Get user input, if given. If a Boolean argument is passed, its value is 1; else undef
@@ -86,6 +87,7 @@ GetOptions( "tree=s" => \$tree,
 			"suppress_seed_seq" => \$suppress_seed_seq,
 			"suppress_MRCA_seq" => \$suppress_MRCA_seq,
 			"suppress_consensus_seq" => \$suppress_consensus_seq,
+			"suppress_MUTATION" => \$suppress_MUTATION,
 			"verbose" => \$verbose
 			)
 			
@@ -131,14 +133,14 @@ chomp($working_directory);
 ##########################################################################################
 # Extract tree file prefix
 my $file_prefix;
-if($tree =~/\/([^\/]+)\..+/) { 
+if($tree =~/\/*([^\/]+)\..+/) { 
 	$file_prefix = $1;
 } else {
 	$file_prefix = 'trevolver_input';
 }
 
 unless ($vcf_output =~ /\w/) {
-	$vcf_output = $file_prefix . "_trevolver.vcf";
+	$vcf_output = $file_prefix . ".vcf";
 }
 
 
@@ -447,14 +449,14 @@ my $total_branch_length = 0;
 my $root_to_tip_length = 0;
 my %taxa_histories;
 my %generational_histories;
-my $node_id = 1;
+my $node_id = 0;
 my %mutated_sites;
 
 my %MRCA_mutation_history;
 my $MRCA_seq;
 my $MRCA_node_id;
 if ($verbose) { print "\n###EVOLUTION ON TREE COMMENCING...\n" }
-evolve_branch($tree, 0, 0, 'n1=root,');
+evolve_branch($tree, 0, 0, 'n0=root,');
 ##########################################################################################
 ##########################################################################################
 
@@ -1095,12 +1097,14 @@ print "\n#######################################################################
 print "# RESULTS:\n";
 print "#########################################################################################\n";
 
-print "\n//MUTATION\n";
-
-print "taxon\tsite\tmutations\n";
-foreach my $taxon (sort {$a <=> $b} keys %taxa_histories) {
-	foreach my $mutated_site (sort {$a <=> $b} keys %{$taxa_histories{$taxon}}) {
-		print "$taxon\t$mutated_site\t" . $taxa_histories{$taxon}->{$mutated_site} . "\n";
+unless ($suppress_MUTATION) {
+	print "\n//MUTATION\n";
+	
+	print "taxon\tsite\tmutations\n";
+	foreach my $taxon (sort {$a <=> $b} keys %taxa_histories) {
+		foreach my $mutated_site (sort {$a <=> $b} keys %{$taxa_histories{$taxon}}) {
+			print "$taxon\t$mutated_site\t" . $taxa_histories{$taxon}->{$mutated_site} . "\n";
+		}
 	}
 }
 
