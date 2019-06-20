@@ -112,7 +112,7 @@ To simulate the evolution of a single sequence, provide a tree with only one tax
 
 ### EXAMPLE 7: MINIMUM OPTIONS WITH OUTPUT TO SCREEN
 
-This will automatically generate a VCF file named **tree\_7taxa\_trevolver.vcf** in the working directory.
+This will automatically generate a VCF file named **tree\_7taxa.vcf** in the working directory.
 
 	trevolver.pl --tree=tree_7taxa.txt --seed_sequence=seed_sequence.fa \
 	--rate_matrix=mutation_CpGx20.txt --branch_unit=1447
