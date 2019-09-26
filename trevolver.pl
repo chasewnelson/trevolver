@@ -32,11 +32,13 @@
 # DATE CREATED: June 2019
 # AUTHOR: Chase W. Nelson
 # CONTACT1: cnelson@amnh.org
-# AFFILIATION: Sackler Institute for Comparative Genomics, American Museum of Natural History, 
-#	New York, NY 10024, USA
+# AFFILIATION: Sackler Institute for Comparative Genomics, American Museum of Natural 
+#	History, New York, NY 10024, USA
 
 # ACKNOWLEDGMENTS: written by C.W.N. with support from a Gerstner Scholars Fellowship from
 # 	the Gerstner Family Foundation at the American Museum of Natural History, New York.
+#########################################################################################
+
 
 use strict;
 use List::Util qw(max sum);
@@ -145,7 +147,7 @@ unless ($vcf_output =~ /\w/) {
 
 
 ##########################################################################################
-# Store the tree
+# Store the tree(s)
 
 open(IN_TREE, "$tree") or die "Could not open file $tree\n";
 
@@ -377,7 +379,7 @@ if ($excluded_taxa) {
 
 if ($verbose) {
 	print "\n################################################################################\n";
-	print "Recursively trivolving sequences from the root...\n";
+	print "Recursively trevolving sequences from the root...\n";
 }
 
 #my %tree;
@@ -1088,8 +1090,8 @@ if ($burn_in) {
 }
 
 print "\ntotal number of mutations on all branches: $num_mutations\n";
-print "\ntotal branch length (generations): $total_branch_length\n";
-print "\nroot-to-tip length (generations): $root_to_tip_length\n";
+print "\ntree length = total branch length (generations): $total_branch_length\n";
+print "\ntree height = root-to-tip length (generations): $root_to_tip_length\n";
 print "\ntotal number of mutations occurred: $num_mutations\n";
 print "\nlength of run in seconds: " . (time - $time1) . "\n\n";
 
@@ -1621,8 +1623,8 @@ sub determine_outgroup_data {
 		if($root_to_tip_length == 0) {
 			$root_to_tip_length = $generations_elapsed;
 		} elsif (int($root_to_tip_length) != int($generations_elapsed)) {
-			die "\n### WARNING: conflicting root-to-tip length measures for taxon $taxon\: $root_to_tip_length vs. $generations_elapsed\.\n" . 
-				"### It is currently required that all root-to-tip lengths, measured in generations, are equal. TREVOLVER TERMINATED.\n\n";
+#			die "\n### WARNING: conflicting root-to-tip length measures for taxon $taxon\: $root_to_tip_length vs. $generations_elapsed\.\n" . 
+#				"### It is currently required that all root-to-tip lengths, measured in generations, are equal. TREVOLVER TERMINATED.\n\n";
 		}
 		
 		if($verbose) { print "evolution of terminal taxon complete; generations_elapsed: " . sprintf("%.3f", $generations_elapsed) . "\n" }
@@ -2491,8 +2493,8 @@ sub evolve_branch {
 		if($root_to_tip_length == 0) {
 			$root_to_tip_length = $generations_elapsed;
 		} elsif (int($root_to_tip_length) != int($generations_elapsed)) {
-			die "\n### WARNING: conflicting root-to-tip length measures for taxon $taxon\: $root_to_tip_length vs. $generations_elapsed\.\n" . 
-				"### It is currently required that all root-to-tip lengths, measured in generations, are equal. TREVOLVER TERMINATED.\n\n";
+#			die "\n### WARNING: conflicting root-to-tip length measures for taxon $taxon\: $root_to_tip_length vs. $generations_elapsed\.\n" . 
+#				"### It is currently required that all root-to-tip lengths, measured in generations, are equal. TREVOLVER TERMINATED.\n\n";
 		}
 		
 		if($verbose) { print "evolution of terminal taxon complete; generations_elapsed: " . sprintf("%.3f", $generations_elapsed) . "\n" }
