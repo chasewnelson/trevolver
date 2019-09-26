@@ -189,7 +189,7 @@ If you have questions about **Trevolver**, please click on the <a target="_blank
 
 When using this software, please refer to and cite:
 
->Nelson CW, Fu Y, Li W-H. Trevolver: simulating non-reversible DNA sequence evolution in trinucleotide context on a bifurcating tree. Submitted to *Bioinformatics*. bioRxiv doi: <a target="_blank" rel="noopener noreferrer" href="https://www.biorxiv.org/content/10.1101/672717v1">https://doi.org/10.1101/672717</a>
+>Nelson CW, Fu Y, Li W-H. Trevolver: simulating non-reversible DNA sequence evolution in trinucleotide context on a bifurcating tree. bioRxiv doi: <a target="_blank" rel="noopener noreferrer" href="https://www.biorxiv.org/content/10.1101/672717v1">https://doi.org/10.1101/672717</a>
 
 and this page:
 
